@@ -63,14 +63,14 @@ jobs:
           test -d "$app"
           test -d "$extension"
           codesign --verify --deep --strict --verbose=2 "$app"
-          codesign -d --entitlements :- "$extension"
+          codesign -d --entitlements - "$extension"
           lipo -archs "$app/Contents/MacOS/${APP_NAME}"
           lipo -archs "$extension/Contents/MacOS/FinderActionsExtension"
           ditto -c -k --sequesterRsrc --keepParent "$app" "${ARCHIVE_NAME}-${{ steps.version.outputs.version }}.zip"
           shasum -a 256 "${ARCHIVE_NAME}-${{ steps.version.outputs.version }}.zip" > "${ARCHIVE_NAME}-${{ steps.version.outputs.version }}.zip.sha256"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: Finder-Actions-${{ steps.version.outputs.version }}
           path: |

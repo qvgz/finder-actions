@@ -1,0 +1,84 @@
+name: Build Dev Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: macos-15
+    env:
+      APP_NAME: Finder Actions
+      ARCHIVE_NAME: Finder-Actions-dev
+      APP_VERSION: 0.0.${{ github.run_number }}
+
+    steps:
+      - name: Check out master
+        uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - name: Build universal dev release
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project FinderActions.xcodeproj \
+            -scheme FinderActions \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -destination "generic/platform=macOS" \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            MARKETING_VERSION="$APP_VERSION" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            DEVELOPMENT_TEAM="" \
+            clean build
+
+      - name: Verify and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/DerivedData/Build/Products/Release/${APP_NAME}.app"
+          extension="$app/Contents/PlugIns/FinderActionsExtension.appex"
+          test -d "$app"
+          test -d "$extension"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -d --entitlements - "$extension"
+          lipo -archs "$app/Contents/MacOS/${APP_NAME}"
+          lipo -archs "$extension/Contents/MacOS/FinderActionsExtension"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "${ARCHIVE_NAME}.zip"
+          shasum -a 256 "${ARCHIVE_NAME}.zip" > "${ARCHIVE_NAME}.zip.sha256"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Finder-Actions-dev-${{ github.run_number }}
+          path: |
+            Finder-Actions-dev.zip
+            Finder-Actions-dev.zip.sha256
+          if-no-files-found: error
+
+      - name: Replace dev release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release delete dev --cleanup-tag --yes 2>/dev/null || true
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/dev" 2>/dev/null || true
+          gh release create dev \
+            Finder-Actions-dev.zip \
+            Finder-Actions-dev.zip.sha256 \
+            --target master \
+            --prerelease \
+            --title "Finder Actions dev" \
+            --notes "Development build from master at ${GITHUB_SHA}. App version: ${APP_VERSION}."
