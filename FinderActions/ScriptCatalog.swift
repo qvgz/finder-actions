@@ -74,7 +74,8 @@ enum ScriptCatalog {
         return FinderActionDefinition(
             id: action.id,
             name: action.name,
-            summary: action.summary,
+            summaryZH: action.summaryZH,
+            summaryEN: action.summaryEN,
             scriptFileName: action.scriptFileName
         )
     }
@@ -107,15 +108,26 @@ enum ScriptCatalog {
               let text = try? String(contentsOf: url, encoding: .utf8)
         else { return nil }
         let lines = text.components(separatedBy: .newlines)
-        guard lines.count >= 2, lines[0].hasPrefix("#!") else { return nil }
-        let summaryLine = lines[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        guard summaryLine.hasPrefix("#") else { return nil }
-        let summary = String(summaryLine.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !summary.isEmpty else { return nil }
+        guard !lines.isEmpty, lines[0].hasPrefix("#!") else { return nil }
+        let summaryZH = summary(from: lines, at: 1)
+        let summaryEN = summary(from: lines, at: 2)
         let fileName = url.lastPathComponent
         let name = url.deletingPathExtension().lastPathComponent
         guard !name.isEmpty else { return nil }
-        return FinderActionDefinition(id: "script.\(fileName)", name: name, summary: summary, scriptFileName: fileName)
+        return FinderActionDefinition(
+            id: "script.\(fileName)",
+            name: name,
+            summaryZH: summaryZH,
+            summaryEN: summaryEN,
+            scriptFileName: fileName
+        )
+    }
+
+    private static func summary(from lines: [String], at index: Int) -> String {
+        guard lines.indices.contains(index) else { return "" }
+        let line = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard line.hasPrefix("#"), !line.hasPrefix("#!") else { return "" }
+        return String(line.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func isTrustedScriptFile(_ url: URL) -> Bool {
@@ -162,7 +174,7 @@ enum ScriptCatalog {
         var errorDescription: String? {
             switch self {
             case .invalidScript:
-                return "脚本第一行必须是 Shebang（例如 #!/bin/bash），第二行必须是功能说明注释。"
+                return "脚本第一行必须是 Shebang，例如 #!/bin/bash。"
             case .duplicateFileName:
                 return "脚本文件夹中已有同名文件，请先改名再添加。"
             case .unsafeActionsDirectory:

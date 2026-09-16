@@ -3,12 +3,13 @@ import Foundation
 struct FinderActionDefinition: Codable, Hashable, Identifiable {
     let id: String
     let name: String
-    let summary: String
+    let summaryZH: String
+    let summaryEN: String
     let scriptFileName: String
 }
 
 enum FinderActionStore {
-    static let actionsKey = "scriptActions"
+    static let actionsKey = "localizedScriptActions"
 
     static func load(from defaults: UserDefaults) -> [FinderActionDefinition] {
         guard let data = defaults.data(forKey: actionsKey),

@@ -24,7 +24,7 @@ Finder Actions requires macOS 13 Ventura or later.
    xattr -dr com.apple.quarantine "/Applications/Finder Actions.app"
    ```
 
-4. Open Finder Actions once.
+4. Open Finder Actions once and choose **English** or **中文（简体）** when prompted.
 5. Go to **System Settings → General → Login Items & Extensions → Finder Extensions**, then enable **FinderActionsExtension**.
 6. Return to Finder. If the actions do not appear immediately, restart Finder:
 
@@ -44,6 +44,8 @@ Open Finder Actions, then:
 4. Click the minus button to remove an action from the context menu.
 
 Changes, including action order, are saved automatically and normally do not require restarting Finder. Removing an action does not delete its script, so you can add it again later.
+
+To change the interface language later, expand **Language / 语言** at the bottom of the settings window and select English or Simplified Chinese.
 
 ## Choose Where Actions Appear
 
@@ -73,12 +75,15 @@ Choose **Add Finder Action → Add Custom Script**. Finder Actions copies the sc
 
 ```bash
 #!/bin/bash
+# 中文功能说明
 # Describe what this action does for the user
 ```
 
 - The filename without its final extension becomes the context-menu title. For example, `New Text.sh` appears as “New Text.”
 - The first line must be a shebang.
-- The second line must be a comment describing the action.
+- The second line is the optional Simplified Chinese description.
+- The third line is the optional English description.
+- Both descriptions may be omitted. To provide only an English description, keep an empty `#` comment on the second line.
 - The Finder target's absolute path is passed as the first argument, `$1`.
 
 You can also choose **Add Finder Action → Open Scripts Folder** to manage scripts directly. After adding or editing a script there, choose **Refresh Action List** from the same menu. Finder Actions automatically ignores files that do not meet its format or security requirements.

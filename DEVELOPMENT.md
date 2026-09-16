@@ -15,7 +15,7 @@ Finder Actions 解决 macOS Finder 原生右键操作不易扩展的问题。它
 
 ## 产品和开发原则
 
-- 配置界面优先符合非技术用户、普通办公用户的直觉。技术概念只能放在高级入口或开发文档中。
+- 配置界面优先符合非技术用户、普通办公用户的直觉。技术概念只能放在高级入口或开发文档中。所有用户界面同时维护自然的英文与简体中文表达，不要求逐字对应。
 - Swift 保持通用，不为单个应用增加专用执行分支。
 - 当前只有一个实际用户。除非需求明确提出，否则不做旧版本配置迁移和数据兼容。
 - 当前只考虑 Ad-hoc 签名，不以正式 Developer ID 签名或 App Store 沙盒方案为前提。
@@ -79,12 +79,14 @@ Shared/
 
 ```bash
 #!/bin/bash
-# 面向用户的功能说明
+# 面向用户的中文功能说明
+# English description shown to the user
 ```
 
 - 文件名去掉最后一个扩展名后是菜单显示名。
 - 第一行必须以 `#!` 开头。
-- 第二行必须是非空注释，去掉 `#` 和首尾空白后作为 `summary`。
+- 第二行是简体中文摘要，第三行是英文摘要；各自去掉 `#` 和首尾空白后存储。
+- 两种摘要都可为空，也可同时省略。只写英文摘要时，第二行必须保留空的 `#`，以固定英文摘要位于第三行。
 - 操作 ID 为 `script.<完整文件名>`。
 - `$1` 是文件、文件夹或 Finder 当前目录的绝对路径。Swift 不替脚本转换目标类型。
 - 脚本自行决定如何处理文件目标。例如内置 Alacritty、Code 脚本会把文件转换为其父目录。
@@ -115,7 +117,8 @@ Shared/
 struct FinderActionDefinition: Codable, Hashable, Identifiable {
     let id: String
     let name: String
-    let summary: String
+    let summaryZH: String
+    let summaryEN: String
     let scriptFileName: String
 }
 ```
@@ -136,16 +139,17 @@ io.github.qvgz.FinderActions.Shared
 
 | 键 | 类型 | 含义 |
 | --- | --- | --- |
-| `scriptActions` | JSON `Data` | 已启用操作的有序数组 |
+| `localizedScriptActions` | JSON `Data` | 已启用操作的有序数组及中英文摘要 |
 | `monitoredDirectories` | `[String]` | 用户选择的监控目录绝对路径 |
 | `monitoredDirectoriesConfigured` | `Bool` | 是否已经保存过目录配置；用于区分“首次运行”和“用户主动清空” |
 | `diagnosticsEnabled` | `Bool` | 是否记录详细诊断日志 |
+| `interfaceLanguage` | `String` | 设置界面语言：`english` 或 `simplifiedChinese` |
 
 宿主 App 非沙盒，负责写入偏好。Finder 扩展必须启用 App Sandbox，通过 entitlement `com.apple.security.temporary-exception.shared-preference.read-only` 只读该偏好域。这是为了兼容 Ad-hoc 签名；不使用需要 Team ID 和 provisioning profile 的 App Group。
 
 每次保存后调用 `CFPreferencesAppSynchronize`，扩展构建菜单前调用 `defaults.synchronize()`，降低两个进程看到旧配置的概率。新增或修改偏好键时必须同步更新宿主与扩展的 `AppConstants.swift`，以及本文档。
 
-不要恢复旧的 `finderActions`、`alacrittyEnabled` 或 `codeEnabled` 迁移逻辑，除非后续需求明确要求兼容旧版本。
+不要恢复旧的 `finderActions`、`scriptActions`、`alacrittyEnabled` 或 `codeEnabled` 迁移逻辑，除非后续需求明确要求兼容旧版本。
 
 ## Finder 监控目录
 
@@ -179,8 +183,13 @@ Finder 会把扩展直接注册的监控根显示为扩展图标。跨宗卷稳�
 1. 选择“右键时可以做什么”。
 2. 选择“这些功能在哪里出现”。
 3. 排障和诊断放入折叠区域。
+4. 语言设置使用始终双语显示的 `Language / 语言` 折叠入口。
 
-启用项显示在可滚动列表中，三横线把手用于拖动排序，减号表示从右键菜单移除。只有把手可以发起拖动，整行作为放置目标，以避免滚动、删除和拖动手势冲突。排序仅改变 `scriptActions` 数组顺序，不需要重启 Finder。添加菜单包含未启用操作、自定义脚本导入、打开脚本文件夹和刷新功能列表。技术错误必须转换为用户能采取行动的提示；不要把 POSIX 权限、偏好域、Finder Sync 生命周期等术语直接暴露给普通用户。
+启用项显示在可滚动列表中，三横线把手用于拖动排序，减号表示从右键菜单移除。只有把手可以发起拖动，整行作为放置目标，以避免滚动、删除和拖动手势冲突。排序仅改变 `localizedScriptActions` 数组顺序，不需要重启 Finder。添加菜单包含未启用操作、自定义脚本导入、打开脚本文件夹和刷新功能列表。技术错误必须转换为用户能采取行动的提示；不要把 POSIX 权限、偏好域、Finder Sync 生命周期等术语直接暴露给普通用户。
+
+首次启动且 `interfaceLanguage` 尚未保存时，必须显示不可跳过的双语语言选择页。标题、说明和两个按钮各自包含足以让只懂英文或只懂中文的用户识别的信息。用户选择后立即保存语言；以后可通过 `Language / 语言` 重新配置。
+
+界面文案通过同一调用点成对提供英文和中文，新增或修改交互时必须同时编写两套自然表达。英文应遵循英文软件习惯，中文应遵循中文软件习惯，不为了句式对齐进行生硬直译。脚本摘要优先显示当前语言版本；该版本为空时回退到另一语言；两者都为空时不显示摘要行。
 
 ## 诊断日志
 
@@ -222,7 +231,8 @@ Finder 通过 URL Scheme 唤醒宿主是为了避免沙盒扩展直接运行外�
 3. `plutil -lint` 检查工程、Info.plist 和 entitlements
 4. `xcodebuild` 构建 FinderActions scheme
 5. `codesign --verify --deep --strict` 检查 App
-6. 安装后实际验证空白区域、文件、文件夹、外置宗卷和启停操作
+6. 清除 `interfaceLanguage` 后验证首次启动双语选择，并验证运行时切换英文和中文
+7. 安装后实际验证空白区域、文件、文件夹、外置宗卷和启停操作
 
 ## 发布工作流
 

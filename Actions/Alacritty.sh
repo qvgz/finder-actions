@@ -1,5 +1,6 @@
 #!/bin/bash
 # 使用 Alacritty 打开当前文件夹
+# Open the current folder in Alacritty
 set -euo pipefail
 
 target="${1:?缺少目标路径}"

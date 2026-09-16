@@ -5,6 +5,7 @@ enum AppConstants {
     static let urlScheme = "finder-actions"
     static let monitoredDirectoriesKey = "monitoredDirectories"
     static let monitoredDirectoriesConfiguredKey = "monitoredDirectoriesConfigured"
+    static let interfaceLanguageKey = "interfaceLanguage"
 
     static var sharedDefaults: UserDefaults {
         UserDefaults(suiteName: sharedPreferencesDomain) ?? .standard

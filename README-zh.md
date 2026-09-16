@@ -24,7 +24,7 @@ Finder Actions 为 macOS Finder 增加实用的右键功能。你可以在 Finde
    xattr -dr com.apple.quarantine "/Applications/Finder Actions.app"
    ```
 
-4. 打开一次 Finder Actions。
+4. 打开一次 Finder Actions，并在提示中选择 **English** 或 **中文（简体）**。
 5. 前往“系统设置 → 通用 → 登录项与扩展 → Finder 扩展”，启用 **FinderActionsExtension**。
 6. 回到 Finder。如果右键功能没有立即出现，请重新打开 Finder：
 
@@ -44,6 +44,8 @@ Finder Actions 不需要加入登录项，也不需要保持窗口打开。请�
 4. 点击功能右侧的减号，将它从 Finder 右键菜单移除。
 
 排序和其他功能列表变化会自动保存，通常不需要重新打开 Finder。移除功能不会删除对应脚本，以后仍可重新添加。
+
+以后如需更改界面语言，请展开设置窗口底部的 **Language / 语言**，然后选择英文或简体中文。
 
 ## 设置显示位置
 
@@ -73,12 +75,15 @@ Finder Actions 不需要加入登录项，也不需要保持窗口打开。请�
 
 ```bash
 #!/bin/bash
-# 这里填写显示给用户的功能说明
+# 这里填写中文功能说明
+# Describe this action in English
 ```
 
 - 文件名去掉最后一个后缀后，就是右键菜单名称。例如 `New Text.sh` 显示为“New Text”。
 - 第一行必须是 Shebang。
-- 第二行必须是功能说明注释。
+- 第二行是可选的中文功能说明。
+- 第三行是可选的英文功能说明。
+- 两种说明可以同时省略。如果只填写英文说明，第二行需要保留一个空的 `#` 注释。
 - Finder 中的目标绝对路径通过第一个参数 `$1` 传给脚本。
 
 也可以通过“添加右键功能 → 打开脚本文件夹”管理脚本。手动新增或修改后，点击同一菜单中的“刷新功能列表”。不符合格式或安全要求的文件会被自动忽略。

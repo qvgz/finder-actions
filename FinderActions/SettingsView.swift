@@ -2,11 +2,18 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum InterfaceLanguage: String, CaseIterable {
+    case english
+    case simplifiedChinese
+}
+
 struct SettingsView: View {
     @State private var finderActions: [FinderActionDefinition]
     @State private var availableActions: [FinderActionDefinition]
     @State private var actionsStatusMessage: String
     @State private var draggingActionID: String?
+    @State private var interfaceLanguage: InterfaceLanguage
+    @State private var languageSelectionPresented: Bool
     @State private var monitoredDirectories = SettingsView.initialMonitoredDirectories()
     @State private var directoriesNeedRestart = false
     @State private var troubleshootingExpanded = false
@@ -14,6 +21,9 @@ struct SettingsView: View {
 
     init() {
         let defaults = AppConstants.sharedDefaults
+        let savedLanguage = defaults.string(forKey: AppConstants.interfaceLanguageKey)
+            .flatMap { InterfaceLanguage(rawValue: $0) }
+        let initialLanguage = savedLanguage ?? .english
         let stored = FinderActionStore.load(from: defaults)
         let catalog: [FinderActionDefinition]
         let preparationError: Error?
@@ -41,9 +51,13 @@ struct SettingsView: View {
         _finderActions = State(initialValue: enabledActions)
         _availableActions = State(initialValue: catalog)
         _actionsStatusMessage = State(
-            initialValue: preparationError == nil ? "更改会自动保存" : "功能文件夹暂时无法读取"
+            initialValue: preparationError == nil
+                ? (initialLanguage == .english ? "Changes are saved automatically" : "更改会自动保存")
+                : (initialLanguage == .english ? "The actions folder is unavailable" : "功能文件夹暂时无法读取")
         )
         _draggingActionID = State(initialValue: nil)
+        _interfaceLanguage = State(initialValue: initialLanguage)
+        _languageSelectionPresented = State(initialValue: savedLanguage == nil)
     }
 
     var body: some View {
@@ -54,6 +68,7 @@ struct SettingsView: View {
                     actionsSection
                     locationsSection
                     troubleshootingSection
+                    languageSection
                 }
                 .padding(28)
             }
@@ -64,6 +79,13 @@ struct SettingsView: View {
                 .padding(.vertical, 16)
         }
         .frame(width: 680, height: 760)
+        .sheet(isPresented: $languageSelectionPresented) {
+            FirstLaunchLanguageView { language in
+                setInterfaceLanguage(language)
+                languageSelectionPresented = false
+            }
+            .interactiveDismissDisabled()
+        }
     }
 
     private var header: some View {
@@ -75,9 +97,12 @@ struct SettingsView: View {
                 .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("设置 Finder 右键菜单")
+                Text(t("Set Up Finder Actions", "设置 Finder 右键菜单"))
                     .font(.title2.bold())
-                Text("选择右键时显示的功能，以及可以使用这些功能的位置。")
+                Text(t(
+                    "Choose which actions appear in Finder and where they are available.",
+                    "选择右键时显示的功能，以及可以使用这些功能的位置。"
+                ))
                     .foregroundStyle(.secondary)
             }
         }
@@ -87,16 +112,22 @@ struct SettingsView: View {
         settingsCard {
             sectionHeader(
                 number: "1",
-                title: "选择右键功能",
-                description: "这些功能会按下方顺序显示在 Finder 右键菜单中。"
+                title: t("Choose Finder Actions", "选择右键功能"),
+                description: t(
+                    "Actions appear in Finder's context menu in the order shown below.",
+                    "这些功能会按下方顺序显示在 Finder 右键菜单中。"
+                )
             )
 
             listContainer(height: 150) {
                 if finderActions.isEmpty {
                     emptyState(
                         icon: "cursorarrow.rays",
-                        title: "还没有右键功能",
-                        message: "点击下方按钮，选择要显示在右键菜单中的功能。"
+                        title: t("No actions selected", "还没有右键功能"),
+                        message: t(
+                            "Use the button below to add an action to Finder.",
+                            "点击下方按钮，选择要显示在右键菜单中的功能。"
+                        )
                     )
                 } else {
                     ForEach(finderActions) { action in
@@ -120,18 +151,18 @@ struct SettingsView: View {
                     }
 
                     Button(action: addScript) {
-                        Label("添加自定义脚本（高级）…", systemImage: "scroll")
+                        Label(t("Add Custom Script (Advanced)…", "添加自定义脚本（高级）…"), systemImage: "scroll")
                     }
 
                     Button(action: ScriptCatalog.revealActionsDirectory) {
-                        Label("打开脚本文件夹", systemImage: "folder")
+                        Label(t("Open Scripts Folder", "打开脚本文件夹"), systemImage: "folder")
                     }
 
                     Button(action: refreshActions) {
-                        Label("刷新功能列表", systemImage: "arrow.clockwise")
+                        Label(t("Refresh Action List", "刷新功能列表"), systemImage: "arrow.clockwise")
                     }
                 } label: {
-                    Label("添加右键功能", systemImage: "plus")
+                    Label(t("Add Finder Action", "添加右键功能"), systemImage: "plus")
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
@@ -148,16 +179,22 @@ struct SettingsView: View {
         settingsCard {
             sectionHeader(
                 number: "2",
-                title: "选择显示位置",
-                description: "右键功能会出现在这些位置及其子文件夹中。推荐设置适合大多数用户。"
+                title: t("Choose Locations", "选择显示位置"),
+                description: t(
+                    "Actions appear in these locations and their subfolders. The recommended locations work for most people.",
+                    "右键功能会出现在这些位置及其子文件夹中。推荐设置适合大多数用户。"
+                )
             )
 
             listContainer(height: 160) {
                 if monitoredDirectories.isEmpty {
                     emptyState(
                         icon: "folder.badge.questionmark",
-                        title: "没有选择显示位置",
-                        message: "右键功能暂时不会出现在 Finder 中。"
+                        title: t("No locations selected", "没有选择显示位置"),
+                        message: t(
+                            "Finder actions will not appear until you add a location.",
+                            "右键功能暂时不会出现在 Finder 中。"
+                        )
                     )
                 } else {
                     ForEach(monitoredDirectories, id: \.self) { path in
@@ -168,9 +205,9 @@ struct SettingsView: View {
 
             HStack {
                 Button(action: addDirectories) {
-                    Label("添加位置…", systemImage: "plus")
+                    Label(t("Add Location…", "添加位置…"), systemImage: "plus")
                 }
-                Button("使用推荐位置", action: restoreRecommendedDirectories)
+                Button(t("Use Recommended Locations", "使用推荐位置"), action: restoreRecommendedDirectories)
                 Spacer()
             }
 
@@ -179,14 +216,17 @@ struct SettingsView: View {
                     Image(systemName: "arrow.clockwise.circle.fill")
                         .foregroundStyle(.orange)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("位置已更改")
+                        Text(t("Locations changed", "位置已更改"))
                             .fontWeight(.medium)
-                        Text("应用后，新位置才会出现在右键菜单中。Finder 会自动重新打开。")
+                        Text(t(
+                            "Apply the changes to update the context menu. Finder will reopen automatically.",
+                            "应用后，新位置才会出现在右键菜单中。Finder 会自动重新打开。"
+                        ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("应用位置更改", action: applyDirectoryChanges)
+                    Button(t("Apply Location Changes", "应用位置更改"), action: applyDirectoryChanges)
                         .buttonStyle(.borderedProminent)
                 }
                 .padding(12)
@@ -198,12 +238,18 @@ struct SettingsView: View {
     private var troubleshootingSection: some View {
         DisclosureGroup(isExpanded: $troubleshootingExpanded) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("如果右键菜单没有出现，请先确认 FinderActionsExtension 已启用。部分云盘或压缩软件也可能接管同一位置的右键菜单。")
+                Text(t(
+                    "Make sure FinderActionsExtension is enabled. Cloud-storage and archive apps may also take control of the same context menu.",
+                    "如果右键菜单没有出现，请先确认 FinderActionsExtension 已启用。部分云盘或压缩软件也可能接管同一位置的右键菜单。"
+                ))
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
                 if legacyWorkflowsInstalled {
-                    Label("检测到旧版 Alacritty/Code 服务，建议从“~/Library/Services”中移除。", systemImage: "exclamationmark.triangle.fill")
+                    Label(t(
+                        "Legacy Alacritty/Code services were found. Remove them from ~/Library/Services to avoid duplicates.",
+                        "检测到旧版 Alacritty/Code 服务，建议从“~/Library/Services”中移除。"
+                    ), systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
                         .foregroundStyle(.orange)
                 }
@@ -211,26 +257,57 @@ struct SettingsView: View {
                 Divider()
 
                 Toggle(
-                    "收集问题诊断信息",
+                    t("Collect Diagnostic Information", "收集问题诊断信息"),
                     isOn: Binding(
                         get: { diagnosticsEnabled },
                         set: { setDiagnosticsEnabled($0) }
                     )
                 )
 
-                Text("默认关闭。开启后会记录右键菜单、所选位置和启动结果，方便开发者远程判断问题。日志可能包含文件路径。")
+                Text(t(
+                    "Off by default. When enabled, diagnostic details are recorded to help investigate issues remotely. Logs may contain file paths.",
+                    "默认关闭。开启后会记录右键菜单、所选位置和启动结果，方便开发者远程判断问题。日志可能包含文件路径。"
+                ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 if diagnosticsEnabled {
-                    Button("将诊断日志保存到桌面…", action: exportDiagnosticLog)
+                    Button(t("Save Diagnostic Log to Desktop…", "将诊断日志保存到桌面…"), action: exportDiagnosticLog)
                 }
 
-                Button("打开系统中的 Finder 扩展设置", action: openExtensionSettings)
+                Button(t("Open Finder Extension Settings", "打开系统中的 Finder 扩展设置"), action: openExtensionSettings)
             }
             .padding(.top, 10)
         } label: {
-            Label("右键菜单没有出现？", systemImage: "questionmark.circle")
+            Label(t("Context menu not showing?", "右键菜单没有出现？"), systemImage: "questionmark.circle")
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var languageSection: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(t(
+                    "Choose the language used in Finder Actions.",
+                    "选择 Finder Actions 使用的界面语言。"
+                ))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                Picker("", selection: Binding(
+                    get: { interfaceLanguage },
+                    set: { setInterfaceLanguage($0) }
+                )) {
+                    Text("English").tag(InterfaceLanguage.english)
+                    Text("中文（简体）").tag(InterfaceLanguage.simplifiedChinese)
+                }
+                .labelsHidden()
+                .pickerStyle(.radioGroup)
+            }
+            .padding(.top, 10)
+        } label: {
+            Label("Language / 语言", systemImage: "globe")
                 .fontWeight(.medium)
         }
         .padding(.horizontal, 4)
@@ -238,11 +315,16 @@ struct SettingsView: View {
 
     private var footer: some View {
         HStack {
-            Text(directoriesNeedRestart ? "还有位置更改尚未应用" : "所有更改均已保存")
+            Text(directoriesNeedRestart
+                ? t("Location changes have not been applied", "还有位置更改尚未应用")
+                : t("All changes are saved", "所有更改均已保存"))
                 .font(.caption)
                 .foregroundStyle(directoriesNeedRestart ? Color.orange : Color.secondary)
             Spacer()
-            Button(directoriesNeedRestart ? "应用并完成" : "完成", action: finish)
+            Button(
+                directoriesNeedRestart ? t("Apply and Done", "应用并完成") : t("Done", "完成"),
+                action: finish
+            )
                 .keyboardShortcut(.defaultAction)
         }
     }
@@ -250,6 +332,26 @@ struct SettingsView: View {
     private var disabledActions: [FinderActionDefinition] {
         let enabledIDs = Set(finderActions.map(\.id))
         return availableActions.filter { !enabledIDs.contains($0.id) }
+    }
+
+    private func t(_ english: String, _ chinese: String) -> String {
+        interfaceLanguage == .english ? english : chinese
+    }
+
+    private func actionSummary(_ action: FinderActionDefinition) -> String {
+        let preferred = interfaceLanguage == .english ? action.summaryEN : action.summaryZH
+        let fallback = interfaceLanguage == .english ? action.summaryZH : action.summaryEN
+        return preferred.isEmpty ? fallback : preferred
+    }
+
+    private func setInterfaceLanguage(_ language: InterfaceLanguage) {
+        interfaceLanguage = language
+        let defaults = AppConstants.sharedDefaults
+        defaults.set(language.rawValue, forKey: AppConstants.interfaceLanguageKey)
+        CFPreferencesAppSynchronize(AppConstants.sharedPreferencesDomain as CFString)
+        actionsStatusMessage = language == .english
+            ? "Changes are saved automatically"
+            : "更改会自动保存"
     }
 
     private func settingsCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -319,17 +421,19 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(action.name)
                     .fontWeight(.medium)
-                Text(action.summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                if !actionSummary(action).isEmpty {
+                    Text(actionSummary(action))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
 
             Spacer()
 
             if ScriptCatalog.executableScriptURL(for: action) == nil {
-                Text("无法使用")
+                Text(t("Unavailable", "无法使用"))
                     .font(.caption)
                     .foregroundStyle(.red)
             }
@@ -343,8 +447,8 @@ struct SettingsView: View {
                     draggingActionID = action.id
                     return NSItemProvider(object: action.id as NSString)
                 }
-                .accessibilityLabel("调整 \(action.name) 的顺序")
-                .help("拖动调整右键菜单顺序")
+                .accessibilityLabel(t("Reorder \(action.name)", "调整 \(action.name) 的顺序"))
+                .help(t("Drag to reorder the context menu", "拖动调整右键菜单顺序"))
 
             Button {
                 removeFinderAction(action)
@@ -353,7 +457,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
-            .help("从右键菜单中移除")
+            .help(t("Remove from the context menu", "从右键菜单中移除"))
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 52)
@@ -390,7 +494,7 @@ struct SettingsView: View {
             Spacer()
 
             if !FileManager.default.fileExists(atPath: path) {
-                Text("当前不可用")
+                Text(t("Unavailable", "当前不可用"))
                     .font(.caption)
                     .foregroundStyle(.red)
             }
@@ -402,7 +506,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
-            .help("移除此位置")
+            .help(t("Remove this location", "移除此位置"))
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 52)
@@ -410,9 +514,9 @@ struct SettingsView: View {
 
     private func directoryName(_ path: String) -> String {
         switch path {
-        case FileManager.default.homeDirectoryForCurrentUser.path: return "个人文件夹"
-        case "/Applications": return "应用程序"
-        case "/Volumes": return "外置磁盘"
+        case FileManager.default.homeDirectoryForCurrentUser.path: return t("Home", "个人文件夹")
+        case "/Applications": return t("Applications", "应用程序")
+        case "/Volumes": return t("External Volumes", "外置磁盘")
         default: return URL(fileURLWithPath: path).lastPathComponent
         }
     }
@@ -449,25 +553,37 @@ struct SettingsView: View {
             finderActions = finderActions.compactMap { catalogByID[$0.id] }
             availableActions = result.actions
             saveFinderActions()
-            actionsStatusMessage = "已刷新，共找到 \(result.actions.count) 个功能"
+            actionsStatusMessage = t(
+                "Refreshed — \(result.actions.count) actions found",
+                "已刷新，共找到 \(result.actions.count) 个功能"
+            )
 
             if result.ignoredFileCount > 0 {
                 showAlert(
-                    title: "部分文件没有加入",
-                    message: "有 \(result.ignoredFileCount) 个文件格式或安全设置不符合要求，已自动忽略。其他功能可以正常使用。"
+                    title: t("Some files were skipped", "部分文件没有加入"),
+                    message: t(
+                        "\(result.ignoredFileCount) files did not meet the format or security requirements and were ignored. Other actions are ready to use.",
+                        "有 \(result.ignoredFileCount) 个文件格式或安全设置不符合要求，已自动忽略。其他功能可以正常使用。"
+                    )
                 )
             }
         } catch {
-            actionsStatusMessage = "刷新失败"
-            showAlert(title: "无法刷新功能列表", message: error.localizedDescription)
+            actionsStatusMessage = t("Refresh failed", "刷新失败")
+            showAlert(
+                title: t("Could Not Refresh Actions", "无法刷新功能列表"),
+                message: localizedCatalogError(error)
+            )
         }
     }
 
     private func addScript() {
         let panel = NSOpenPanel()
-        panel.title = "选择要添加的脚本"
-        panel.message = "文件名会显示在右键菜单中。脚本第一行需为 Shebang，第二行需为功能说明注释。"
-        panel.prompt = "添加脚本"
+        panel.title = t("Choose a Script", "选择要添加的脚本")
+        panel.message = t(
+            "The filename becomes the menu title. The first line must be a shebang; lines two and three may contain Chinese and English descriptions.",
+            "文件名会显示在右键菜单中。第一行必须是 Shebang，第二、三行可以填写中英文功能说明。"
+        )
+        panel.prompt = t("Add Script", "添加脚本")
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
@@ -480,7 +596,7 @@ struct SettingsView: View {
             finderActions.append(action)
             saveFinderActions()
         } catch {
-            showAlert(title: "无法添加这个脚本", message: error.localizedDescription)
+            showAlert(title: t("Could Not Add Script", "无法添加这个脚本"), message: localizedCatalogError(error))
         }
     }
 
@@ -490,6 +606,23 @@ struct SettingsView: View {
         alert.informativeText = message
         alert.alertStyle = .informational
         alert.runModal()
+    }
+
+    private func localizedCatalogError(_ error: Error) -> String {
+        guard interfaceLanguage == .english,
+              let catalogError = error as? ScriptCatalog.CatalogError
+        else { return error.localizedDescription }
+
+        switch catalogError {
+        case .invalidScript:
+            return "The first line of the script must be a shebang, such as #!/bin/bash."
+        case .duplicateFileName:
+            return "A script with this filename is already in the actions folder. Rename it and try again."
+        case .unsafeActionsDirectory:
+            return "The actions folder could not be opened safely. Recreate the folder and try again."
+        case .unsafeScript:
+            return "The script could not be added because its owner or file permissions are not safe."
+        }
     }
 
     private func saveFinderActions() {
@@ -503,9 +636,12 @@ struct SettingsView: View {
 
     private func addDirectories() {
         let panel = NSOpenPanel()
-        panel.title = "选择显示右键功能的位置"
-        panel.message = "所选文件夹及其子文件夹都会显示 Finder Actions。"
-        panel.prompt = "添加位置"
+        panel.title = t("Choose Where Actions Appear", "选择显示右键功能的位置")
+        panel.message = t(
+            "Finder Actions will appear in each selected folder and its subfolders.",
+            "所选文件夹及其子文件夹都会显示 Finder Actions。"
+        )
+        panel.prompt = t("Add Location", "添加位置")
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
@@ -636,12 +772,21 @@ struct SettingsView: View {
             }
 
             NSWorkspace.shared.activateFileViewerSelecting([logURL])
-            showAlert(title: "诊断日志已保存", message: "文件已保存到桌面，可以直接发送给开发者。")
+            showAlert(
+                title: t("Diagnostic Log Saved", "诊断日志已保存"),
+                message: t(
+                    "The log was saved to your Desktop and is ready to share with the developer.",
+                    "文件已保存到桌面，可以直接发送给开发者。"
+                )
+            )
         } catch {
             try? FileManager.default.removeItem(at: logURL)
             showAlert(
-                title: "无法保存诊断日志",
-                message: "请确认桌面可以正常写入，然后重试。错误：\(error.localizedDescription)"
+                title: t("Could Not Save Diagnostic Log", "无法保存诊断日志"),
+                message: t(
+                    "Make sure your Desktop is writable, then try again. Error: \(error.localizedDescription)",
+                    "请确认桌面可以正常写入，然后重试。错误：\(error.localizedDescription)"
+                )
             )
         }
     }
@@ -664,6 +809,63 @@ struct SettingsView: View {
         return ["Alacritty.workflow", "Code.workflow"].contains { name in
             FileManager.default.fileExists(atPath: servicesURL.appendingPathComponent(name).path)
         }
+    }
+}
+
+private struct FirstLaunchLanguageView: View {
+    let select: (InterfaceLanguage) -> Void
+
+    var body: some View {
+        VStack(spacing: 22) {
+            Image(systemName: "globe")
+                .font(.system(size: 42))
+                .foregroundStyle(.blue)
+
+            VStack(spacing: 6) {
+                Text("Choose your language")
+                    .font(.title2.bold())
+                Text("选择语言")
+                    .font(.title3.bold())
+                Text("Select the language used in Finder Actions.\n选择 Finder Actions 使用的界面语言。")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            HStack(spacing: 14) {
+                languageButton(
+                    title: "English",
+                    subtitle: "Use English",
+                    language: .english
+                )
+                languageButton(
+                    title: "中文（简体）",
+                    subtitle: "使用中文",
+                    language: .simplifiedChinese
+                )
+            }
+        }
+        .padding(32)
+        .frame(width: 480)
+    }
+
+    private func languageButton(
+        title: String,
+        subtitle: String,
+        language: InterfaceLanguage
+    ) -> some View {
+        Button {
+            select(language)
+        } label: {
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+        }
+        .buttonStyle(.bordered)
     }
 }
 
