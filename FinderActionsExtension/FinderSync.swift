@@ -7,7 +7,31 @@ final class FinderSync: FIFinderSync {
 
     override init() {
         super.init()
-        controller.directoryURLs = monitoredDirectoryURLs()
+        refreshMonitoredDirectoryURLs()
+
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(volumesDidChange(_:)),
+            name: NSWorkspace.didMountNotification,
+            object: nil
+        )
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(volumesDidChange(_:)),
+            name: NSWorkspace.didUnmountNotification,
+            object: nil
+        )
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(volumesDidChange(_:)),
+            name: NSWorkspace.didRenameVolumeNotification,
+            object: nil
+        )
+    }
+
+    deinit {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
@@ -68,9 +92,10 @@ final class FinderSync: FIFinderSync {
         let defaults = UserDefaults(suiteName: AppConstants.extensionBundleIdentifier) ?? .standard
         if defaults.bool(forKey: AppConstants.monitoredDirectoriesConfiguredKey) {
             let paths = defaults.stringArray(forKey: AppConstants.monitoredDirectoriesKey) ?? []
-            return Set(paths.map {
+            let configuredURLs = Set(paths.map {
                 URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
             })
+            return addingMountedVolumes(to: configuredURLs)
         }
 
         var urls: Set<URL> = [
@@ -86,6 +111,38 @@ final class FinderSync: FIFinderSync {
         )
         urls.insert(homeURL)
 
+        return addingMountedVolumes(to: urls)
+    }
+
+    private func addingMountedVolumes(to configuredURLs: Set<URL>) -> Set<URL> {
+        let mountedVolumes = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: nil,
+            options: [.skipHiddenVolumes]
+        ) ?? []
+
+        var urls = configuredURLs
+        for volumeURL in mountedVolumes {
+            let standardizedVolumeURL = volumeURL.standardizedFileURL
+            if configuredURLs.contains(where: { contains(standardizedVolumeURL, in: $0) }) {
+                // A monitored directory such as /Volumes does not reliably cross a
+                // mount point, so register the mounted volume as a root as well.
+                urls.insert(standardizedVolumeURL)
+            }
+        }
         return urls
+    }
+
+    private func contains(_ candidateURL: URL, in directoryURL: URL) -> Bool {
+        let directoryComponents = directoryURL.pathComponents
+        let candidateComponents = candidateURL.pathComponents
+        return candidateComponents.starts(with: directoryComponents)
+    }
+
+    private func refreshMonitoredDirectoryURLs() {
+        controller.directoryURLs = monitoredDirectoryURLs()
+    }
+
+    @objc private func volumesDidChange(_ notification: Notification) {
+        refreshMonitoredDirectoryURLs()
     }
 }

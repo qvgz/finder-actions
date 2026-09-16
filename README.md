@@ -58,6 +58,8 @@ Finder Actions 是一个轻量的 macOS Finder Sync 扩展，可在 Finder 的�
 
 修改目录后点击“重启 Finder”使配置生效。直接注册为监控根的目录在 Finder 收藏栏中可能显示 Finder Actions 图标，因此应优先添加需要覆盖目录的父目录。例如监控所有外置卷时添加 `/Volumes`，不要逐个添加 `/Volumes/pd`。
 
+Finder Sync 的目录递归不会可靠跨越宗卷挂载点。配置 `/Volumes` 后，扩展会自动注册其下当前已挂载的宗卷，并在宗卷挂载、卸载或重命名时刷新，无需把每个宗卷单独加入列表。
+
 ## 从标签发布
 
 GitHub Actions 只响应 `vMAJOR.MINOR.PATCH` 形式的标签，例如：
@@ -85,6 +87,7 @@ git push origin v1.0.0
 - Release 标签固定为 `dev`。
 - 下载文件固定为 `Finder-Actions-dev.zip`。
 - 应用版本为 `0.0.<GitHub run number>`。
+- Release 说明列出从最近正式版本标签到当前 `master` 的提交。
 - 每次执行都会删除旧的 `dev` Release 和标签，再基于当前 `master` 创建新的 `dev`。
 
 ## 本地开发
