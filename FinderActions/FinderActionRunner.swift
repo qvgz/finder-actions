@@ -14,8 +14,7 @@ enum FinderActionRunner {
         let defaults = AppConstants.sharedDefaults
         let actions = FinderActionStore.load(from: defaults)
         guard let action = actions.first(where: { $0.id == actionID }),
-              let scriptURL = ScriptCatalog.scriptURL(for: action),
-              FileManager.default.isExecutableFile(atPath: scriptURL.path)
+              let scriptURL = ScriptCatalog.executableScriptURL(for: action)
         else {
             Diagnostics.log("Action is unavailable: id=\(actionID)", defaults: defaults)
             return

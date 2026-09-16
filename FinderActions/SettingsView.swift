@@ -4,27 +4,43 @@ import SwiftUI
 struct SettingsView: View {
     @State private var finderActions: [FinderActionDefinition]
     @State private var availableActions: [FinderActionDefinition]
+    @State private var actionsStatusMessage: String
     @State private var monitoredDirectories = SettingsView.initialMonitoredDirectories()
     @State private var directoriesNeedRestart = false
     @State private var troubleshootingExpanded = false
     @State private var diagnosticsEnabled = Diagnostics.isEnabled(in: AppConstants.sharedDefaults)
 
     init() {
-        try? ScriptCatalog.prepareActionsDirectory()
-        let catalog = ScriptCatalog.availableActions()
         let defaults = AppConstants.sharedDefaults
         let stored = FinderActionStore.load(from: defaults)
+        let catalog: [FinderActionDefinition]
+        let preparationError: Error?
+        do {
+            try ScriptCatalog.prepareActionsDirectory()
+            catalog = ScriptCatalog.availableActions()
+            preparationError = nil
+        } catch {
+            catalog = []
+            preparationError = error
+        }
         let catalogByID = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
         let enabledActions: [FinderActionDefinition]
-        if defaults.data(forKey: FinderActionStore.actionsKey) == nil {
+        if preparationError != nil {
+            enabledActions = stored
+        } else if defaults.data(forKey: FinderActionStore.actionsKey) == nil {
             enabledActions = catalog
         } else {
             enabledActions = stored.compactMap { catalogByID[$0.id] }
         }
-        FinderActionStore.save(enabledActions, to: defaults)
-        CFPreferencesAppSynchronize(AppConstants.sharedPreferencesDomain as CFString)
+        if preparationError == nil {
+            FinderActionStore.save(enabledActions, to: defaults)
+            CFPreferencesAppSynchronize(AppConstants.sharedPreferencesDomain as CFString)
+        }
         _finderActions = State(initialValue: enabledActions)
         _availableActions = State(initialValue: catalog)
+        _actionsStatusMessage = State(
+            initialValue: preparationError == nil ? "更改会自动保存" : "功能文件夹暂时无法读取"
+        )
     }
 
     var body: some View {
@@ -107,6 +123,10 @@ struct SettingsView: View {
                     Button(action: ScriptCatalog.revealActionsDirectory) {
                         Label("打开脚本文件夹", systemImage: "folder")
                     }
+
+                    Button(action: refreshActions) {
+                        Label("刷新功能列表", systemImage: "arrow.clockwise")
+                    }
                 } label: {
                     Label("添加右键功能", systemImage: "plus")
                 }
@@ -114,7 +134,7 @@ struct SettingsView: View {
                 .fixedSize()
 
                 Spacer()
-                Text("更改会自动保存")
+                Text(actionsStatusMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -305,9 +325,7 @@ struct SettingsView: View {
 
             Spacer()
 
-            if ScriptCatalog.scriptURL(for: action).map({
-                !FileManager.default.isExecutableFile(atPath: $0.path)
-            }) ?? true {
+            if ScriptCatalog.executableScriptURL(for: action) == nil {
                 Text("无法使用")
                     .font(.caption)
                     .foregroundStyle(.red)
@@ -397,6 +415,28 @@ struct SettingsView: View {
     private func removeFinderAction(_ action: FinderActionDefinition) {
         finderActions.removeAll { $0.id == action.id }
         saveFinderActions()
+    }
+
+    private func refreshActions() {
+        do {
+            try ScriptCatalog.prepareActionsDirectory()
+            let result = ScriptCatalog.scan()
+            let catalogByID = Dictionary(uniqueKeysWithValues: result.actions.map { ($0.id, $0) })
+            finderActions = finderActions.compactMap { catalogByID[$0.id] }
+            availableActions = result.actions
+            saveFinderActions()
+            actionsStatusMessage = "已刷新，共找到 \(result.actions.count) 个功能"
+
+            if result.ignoredFileCount > 0 {
+                showAlert(
+                    title: "部分文件没有加入",
+                    message: "有 \(result.ignoredFileCount) 个文件格式或安全设置不符合要求，已自动忽略。其他功能可以正常使用。"
+                )
+            }
+        } catch {
+            actionsStatusMessage = "刷新失败"
+            showAlert(title: "无法刷新功能列表", message: error.localizedDescription)
+        }
     }
 
     private func addScript() {

@@ -1,13 +1,28 @@
 import AppKit
+import Darwin
 import Foundation
 
 enum ScriptCatalog {
+    struct ScanResult {
+        let actions: [FinderActionDefinition]
+        let ignoredFileCount: Int
+    }
+
     static let actionsDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/Finder Actions/Actions", isDirectory: true)
 
     static func prepareActionsDirectory() throws {
         let fileManager = FileManager.default
+        if isSymbolicLink(actionsDirectoryURL) {
+            throw CatalogError.unsafeActionsDirectory
+        }
         try fileManager.createDirectory(at: actionsDirectoryURL, withIntermediateDirectories: true)
+        guard (try? actionsDirectoryURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+              isOwnedByCurrentUser(actionsDirectoryURL)
+        else {
+            throw CatalogError.unsafeActionsDirectory
+        }
+        try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: actionsDirectoryURL.path)
         guard let bundledDirectory = Bundle.main.resourceURL?.appendingPathComponent("Actions", isDirectory: true),
               let bundledScripts = try? fileManager.contentsOfDirectory(at: bundledDirectory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
         else { return }
@@ -15,8 +30,9 @@ enum ScriptCatalog {
         for sourceURL in bundledScripts {
             let destinationURL = actionsDirectoryURL.appendingPathComponent(sourceURL.lastPathComponent)
             let sourceData = try Data(contentsOf: sourceURL)
-            if (try? Data(contentsOf: destinationURL)) != sourceData {
-                if fileManager.fileExists(atPath: destinationURL.path) {
+            let destinationIsSafe = isTrustedScriptFile(destinationURL)
+            if !destinationIsSafe || (try? Data(contentsOf: destinationURL)) != sourceData {
+                if itemExistsWithoutFollowingSymbolicLinks(destinationURL) {
                     try fileManager.removeItem(at: destinationURL)
                 }
                 try fileManager.copyItem(at: sourceURL, to: destinationURL)
@@ -26,24 +42,41 @@ enum ScriptCatalog {
     }
 
     static func availableActions() -> [FinderActionDefinition] {
+        scan().actions
+    }
+
+    static func scan() -> ScanResult {
         let urls = (try? FileManager.default.contentsOfDirectory(
             at: actionsDirectoryURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
             options: [.skipsHiddenFiles]
         )) ?? []
-        return urls.compactMap(actionDefinition(at:)).sorted {
+        let actions = urls.compactMap { url -> FinderActionDefinition? in
+            makeExecutableIfSafe(url)
+            guard isTrustedScriptFile(url) else { return nil }
+            return actionDefinition(at: url)
+        }.sorted {
             $0.name.localizedStandardCompare($1.name) == .orderedAscending
         }
+        return ScanResult(actions: actions, ignoredFileCount: urls.count - actions.count)
     }
 
     static func importScript(at sourceURL: URL) throws -> FinderActionDefinition {
-        guard let action = actionDefinition(at: sourceURL) else { throw CatalogError.invalidScript }
-        try FileManager.default.createDirectory(at: actionsDirectoryURL, withIntermediateDirectories: true)
+        guard !isSymbolicLink(sourceURL), let action = actionDefinition(at: sourceURL) else {
+            throw CatalogError.invalidScript
+        }
+        try prepareActionsDirectory()
         let destinationURL = actionsDirectoryURL.appendingPathComponent(sourceURL.lastPathComponent)
-        guard !FileManager.default.fileExists(atPath: destinationURL.path) else { throw CatalogError.duplicateFileName }
+        guard !itemExistsWithoutFollowingSymbolicLinks(destinationURL) else { throw CatalogError.duplicateFileName }
         try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
-        return action
+        guard isTrustedScriptFile(destinationURL) else { throw CatalogError.unsafeScript }
+        return FinderActionDefinition(
+            id: action.id,
+            name: action.name,
+            summary: action.summary,
+            scriptFileName: action.scriptFileName
+        )
     }
 
     static func scriptURL(for action: FinderActionDefinition) -> URL? {
@@ -52,8 +85,20 @@ enum ScriptCatalog {
         return url
     }
 
+    static func executableScriptURL(for action: FinderActionDefinition) -> URL? {
+        guard let url = scriptURL(for: action),
+              isTrustedScriptFile(url),
+              FileManager.default.isExecutableFile(atPath: url.path)
+        else { return nil }
+        return url
+    }
+
     static func revealActionsDirectory() {
-        try? FileManager.default.createDirectory(at: actionsDirectoryURL, withIntermediateDirectories: true)
+        do {
+            try prepareActionsDirectory()
+        } catch {
+            return
+        }
         NSWorkspace.shared.open(actionsDirectoryURL)
     }
 
@@ -63,9 +108,9 @@ enum ScriptCatalog {
         else { return nil }
         let lines = text.components(separatedBy: .newlines)
         guard lines.count >= 2, lines[0].hasPrefix("#!") else { return nil }
-        let summaryLine = lines[1].trimmingCharacters(in: .whitespaces)
+        let summaryLine = lines[1].trimmingCharacters(in: .whitespacesAndNewlines)
         guard summaryLine.hasPrefix("#") else { return nil }
-        let summary = String(summaryLine.dropFirst()).trimmingCharacters(in: .whitespaces)
+        let summary = String(summaryLine.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !summary.isEmpty else { return nil }
         let fileName = url.lastPathComponent
         let name = url.deletingPathExtension().lastPathComponent
@@ -73,9 +118,46 @@ enum ScriptCatalog {
         return FinderActionDefinition(id: "script.\(fileName)", name: name, summary: summary, scriptFileName: fileName)
     }
 
+    private static func isTrustedScriptFile(_ url: URL) -> Bool {
+        guard !isSymbolicLink(url), isOwnedByCurrentUser(url),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              let permissions = attributes[.posixPermissions] as? NSNumber,
+              permissions.intValue & 0o022 == 0
+        else { return false }
+        return true
+    }
+
+    private static func makeExecutableIfSafe(_ url: URL) {
+        guard !isSymbolicLink(url), isOwnedByCurrentUser(url),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              let permissions = attributes[.posixPermissions] as? NSNumber,
+              permissions.intValue & 0o022 == 0
+        else { return }
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
+    private static func isOwnedByCurrentUser(_ url: URL) -> Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let ownerID = attributes[.ownerAccountID] as? NSNumber
+        else { return false }
+        return ownerID.uint32Value == getuid()
+    }
+
+    private static func isSymbolicLink(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+    }
+
+    private static func itemExistsWithoutFollowingSymbolicLinks(_ url: URL) -> Bool {
+        (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil || isSymbolicLink(url)
+    }
+
     enum CatalogError: LocalizedError {
         case invalidScript
         case duplicateFileName
+        case unsafeActionsDirectory
+        case unsafeScript
 
         var errorDescription: String? {
             switch self {
@@ -83,6 +165,10 @@ enum ScriptCatalog {
                 return "脚本第一行必须是 Shebang（例如 #!/bin/bash），第二行必须是功能说明注释。"
             case .duplicateFileName:
                 return "脚本文件夹中已有同名文件，请先改名再添加。"
+            case .unsafeActionsDirectory:
+                return "功能文件夹的安全设置不正确，无法读取。请重新创建该文件夹后再试。"
+            case .unsafeScript:
+                return "脚本的所有者或文件权限不安全，无法添加。"
             }
         }
     }
