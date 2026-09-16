@@ -60,6 +60,14 @@ Finder Actions 是一个轻量的 macOS Finder Sync 扩展，可在 Finder 的�
 
 Finder Sync 的目录递归不会可靠跨越宗卷挂载点。配置 `/Volumes` 后，扩展会自动注册其下当前已挂载的宗卷，并在宗卷挂载、卸载或重命名时刷新，无需把每个宗卷单独加入列表。
 
+Finder 会为扩展直接注册的监控根显示 Finder Actions 图标。因此，无法同时保证跨宗卷右键功能稳定，又让 Finder 将宗卷当作非监控根并完全保留原始动态图标。如果希望收藏栏使用普通图标，可以创建指向宗卷的软链接，再把软链接拖入 Finder 收藏栏，例如：
+
+```bash
+ln -s /Volumes/pd ~/pd-link
+```
+
+通过该收藏项进入的仍是 `/Volumes/pd`，Alacritty 和 Code 右键功能不受影响；创建前请确认 `~/pd-link` 尚不存在，也可以换用其他链接名称或位置。
+
 ## 从标签发布
 
 GitHub Actions 只响应 `vMAJOR.MINOR.PATCH` 形式的标签，例如：
@@ -101,7 +109,7 @@ git push origin v1.0.0
 
 ## 架构说明
 
-Finder Sync 扩展必须启用 App Sandbox。点击菜单项时，扩展通过 `finder-actions://` URL 唤醒宿主应用；宿主应用使用 Launch Services 启动目标程序后立即退出。这避免了从扩展沙盒直接运行外部可执行文件。
+Finder Sync 扩展必须启用 App Sandbox。点击菜单项时，扩展通过 `finder-actions://` URL 唤醒宿主应用；宿主应用以 accessory 模式在后台使用 Launch Services 启动目标程序后立即退出，避免在 Finder 与目标程序之间短暂抢占焦点。这也避免了从扩展沙盒直接运行外部可执行文件。用户直接打开宿主应用时，它才切换为普通前台应用并显示设置窗口。
 
 首次运行默认监控当前用户主目录、`/Applications` 和 `/Volumes`。用户保存自定义列表后，扩展严格使用该列表；空列表也是有效配置。外置卷可通过 `/Volumes` 的子目录递归覆盖，不必将单个卷注册为监控根目录。Alacritty 通过 `open` 启动，Code 通过 Visual Studio Code 应用包内置的 `bin/code` 启动。
 

@@ -10,7 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let application = NSApplication.shared
         let delegate = AppDelegate()
         application.delegate = delegate
-        application.setActivationPolicy(.regular)
+        // Finder actions only need a short-lived background launcher. Staying
+        // accessory avoids briefly taking focus from Finder before the target app opens.
+        application.setActivationPolicy(.accessory)
         application.run()
     }
 
@@ -36,6 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showSettings() {
+        NSApp.setActivationPolicy(.regular)
+
         let contentView = SettingsView()
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 650),
