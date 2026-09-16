@@ -424,7 +424,7 @@ struct SettingsView: View {
 
     private func saveFinderActions() {
         FinderActionStore.save(finderActions, to: AppConstants.sharedDefaults)
-        CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
+        CFPreferencesAppSynchronize(AppConstants.sharedPreferencesDomain as CFString)
         Diagnostics.log(
             "Saved actions: \(finderActions.map(\.id))",
             defaults: AppConstants.sharedDefaults
@@ -467,7 +467,7 @@ struct SettingsView: View {
         let defaults = AppConstants.sharedDefaults
         defaults.set(monitoredDirectories, forKey: AppConstants.monitoredDirectoriesKey)
         defaults.set(true, forKey: AppConstants.monitoredDirectoriesConfiguredKey)
-        CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
+        CFPreferencesAppSynchronize(AppConstants.sharedPreferencesDomain as CFString)
         directoriesNeedRestart = true
         Diagnostics.log(
             "Saved display locations: \(monitoredDirectories)",
@@ -505,7 +505,7 @@ struct SettingsView: View {
             Diagnostics.log("Diagnostics disabled by user", defaults: defaults)
         }
         defaults.set(enabled, forKey: Diagnostics.enabledKey)
-        CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
+        CFPreferencesAppSynchronize(AppConstants.sharedPreferencesDomain as CFString)
         diagnosticsEnabled = enabled
 
         if enabled {

@@ -118,7 +118,7 @@ git push origin v1.0.0
 - 宿主应用：`io.github.qvgz.FinderActions`
 - Finder 扩展：`io.github.qvgz.FinderActions.Extension`
 
-如果 fork 本项目，建议同步修改两个 Bundle ID，以及宿主和扩展中的 `extensionBundleIdentifier` 常量。
+如果 fork 本项目，建议同步修改两个 Bundle ID、共享偏好域及对应的沙盒例外 entitlement。
 
 ## 架构说明
 
@@ -126,7 +126,7 @@ Finder Sync 扩展必须启用 App Sandbox。点击菜单项时，扩展通过�
 
 首次运行默认监控当前用户主目录、`/Applications` 和 `/Volumes`。用户保存自定义列表后，扩展严格使用该列表；空列表也是有效配置。外置卷可通过 `/Volumes` 的子目录递归覆盖，不必将单个卷注册为监控根目录。Alacritty 通过 `open` 启动，Code 通过 Visual Studio Code 应用包内置的 `bin/code` 启动。
 
-操作和监控目录配置写入扩展自身的用户偏好域：宿主应用负责写入，沙盒中的 Finder 扩展通过自己的标准偏好读取，避免两个进程读取不同的配置副本。宿主应用与扩展共同使用 `Shared/FinderActionDefinition.swift` 中的操作模型和存储格式；新增内置应用时只需添加操作定义及对应执行适配器。操作列表通常无需重启 Finder；监控目录在扩展启动时注册，修改后需要重启 Finder。
+操作和监控目录配置写入独立的共享偏好域 `io.github.qvgz.FinderActions.Shared`。非沙盒宿主负责写入，Finder 扩展通过最小范围的 `shared-preference.read-only` 沙盒例外只读访问；此方案兼容 Ad-hoc 签名，不依赖 App Group、Team ID 或 provisioning profile。宿主应用首次启动时会迁移旧偏好。宿主与扩展共同使用 `Shared/FinderActionDefinition.swift` 中的操作模型和存储格式；新增内置应用时只需添加操作定义及对应执行适配器。操作列表通常无需重启 Finder；监控目录在扩展启动时注册，修改后需要重启 Finder。
 
 ## Finder Sync 限制
 
