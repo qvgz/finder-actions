@@ -41,34 +41,29 @@ final class FinderSync: FIFinderSync {
 
         let menu = NSMenu(title: "Finder Actions")
         let defaults = UserDefaults(suiteName: AppConstants.extensionBundleIdentifier) ?? .standard
-
-        if defaults.object(forKey: AppConstants.alacrittyEnabledKey) as? Bool ?? true {
-            menu.addItem(withTitle: "Alacritty", action: #selector(openAlacritty), keyEquivalent: "")
-        }
-        if defaults.object(forKey: AppConstants.codeEnabledKey) as? Bool ?? true {
-            menu.addItem(withTitle: "Code", action: #selector(openCode), keyEquivalent: "")
+        for action in FinderActionStore.load(from: defaults) {
+            let menuItem = menu.addItem(
+                withTitle: action.name,
+                action: #selector(runFinderAction(_:)),
+                keyEquivalent: ""
+            )
+            menuItem.representedObject = action.id
         }
 
         return menu.items.isEmpty ? nil : menu
     }
 
-    @objc private func openAlacritty() {
-        open(action: "alacritty")
-    }
-
-    @objc private func openCode() {
-        open(action: "code")
-    }
-
-    private func open(action: String) {
-        guard let directoryURL = targetDirectoryURL() else { return }
+    @objc private func runFinderAction(_ sender: NSMenuItem) {
+        guard let actionID = sender.representedObject as? String,
+              let selectedTargetURL = targetURL()
+        else { return }
 
         var components = URLComponents()
         components.scheme = AppConstants.urlScheme
         components.host = "open"
         components.queryItems = [
-            URLQueryItem(name: "action", value: action),
-            URLQueryItem(name: "path", value: directoryURL.path)
+            URLQueryItem(name: "action", value: actionID),
+            URLQueryItem(name: "path", value: selectedTargetURL.path)
         ]
 
         if let url = components.url {
@@ -80,13 +75,9 @@ final class FinderSync: FIFinderSync {
         }
     }
 
-    private func targetDirectoryURL() -> URL? {
+    private func targetURL() -> URL? {
         if let selectedURL = controller.selectedItemURLs()?.first {
-            let resourceValues = try? selectedURL.resourceValues(forKeys: [.isDirectoryKey])
-            if selectedURL.hasDirectoryPath || resourceValues?.isDirectory == true {
-                return selectedURL
-            }
-            return selectedURL.deletingLastPathComponent()
+            return selectedURL
         }
 
         return controller.targetedURL()

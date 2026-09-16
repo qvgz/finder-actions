@@ -14,6 +14,8 @@
 		A10000000000000000000006 /* Extension AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* AppConstants.swift */; };
 		A10000000000000000000007 /* FinderActionsExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* FinderActionsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A10000000000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* Assets.xcassets */; };
+		A10000000000000000000009 /* FinderActionDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* FinderActionDefinition.swift */; };
+		A1000000000000000000000A /* FinderActionDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* FinderActionDefinition.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +51,7 @@
 		A20000000000000000000008 /* Extension Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000009 /* FinderActionsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FinderActionsExtension.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000000A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A2000000000000000000000B /* FinderActionDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderActionDefinition.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Finder Actions.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Finder Actions.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* FinderActionsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FinderActionsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -64,6 +67,7 @@
 			children = (
 				A90000000000000000000002 /* FinderActions */,
 				A90000000000000000000003 /* FinderActionsExtension */,
+				A90000000000000000000005 /* Shared */,
 				A90000000000000000000004 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -84,6 +88,12 @@
 			isa = PBXGroup;
 			children = (A30000000000000000000001, A30000000000000000000002, );
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A90000000000000000000005 /* Shared */ = {
+			isa = PBXGroup;
+			children = (A2000000000000000000000B, );
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -144,8 +154,8 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		B20000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, ); runOnlyForDeploymentPostprocessing = 0; };
-		B20000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000005, A10000000000000000000006, ); runOnlyForDeploymentPostprocessing = 0; };
+		B20000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000009, ); runOnlyForDeploymentPostprocessing = 0; };
+		B20000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000005, A10000000000000000000006, A1000000000000000000000A, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */

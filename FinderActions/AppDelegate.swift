@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let contentView = SettingsView()
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 620, height: 650),
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 760),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
