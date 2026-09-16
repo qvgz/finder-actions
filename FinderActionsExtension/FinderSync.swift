@@ -72,7 +72,11 @@ final class FinderSync: FIFinderSync {
         ]
 
         if let url = components.url {
-            NSWorkspace.shared.open(url)
+            let configuration = NSWorkspace.OpenConfiguration()
+            // The host is only a launcher. Activating it would make Finder lose
+            // focus once before Alacritty or Code becomes the foreground app.
+            configuration.activates = false
+            NSWorkspace.shared.open(url, configuration: configuration)
         }
     }
 
