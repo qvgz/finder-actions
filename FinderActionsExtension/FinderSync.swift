@@ -8,6 +8,7 @@ final class FinderSync: FIFinderSync {
     override init() {
         super.init()
         refreshMonitoredDirectoryURLs()
+        Diagnostics.log("Finder extension started", defaults: AppConstants.sharedDefaults)
 
         let notificationCenter = NSWorkspace.shared.notificationCenter
         notificationCenter.addObserver(
@@ -40,8 +41,14 @@ final class FinderSync: FIFinderSync {
         }
 
         let menu = NSMenu(title: "Finder Actions")
-        let defaults = UserDefaults(suiteName: AppConstants.extensionBundleIdentifier) ?? .standard
-        for action in FinderActionStore.load(from: defaults) {
+        let defaults = AppConstants.sharedDefaults
+        defaults.synchronize()
+        let actions = FinderActionStore.load(from: defaults)
+        Diagnostics.log(
+            "Building menu kind=\(menuKind.rawValue), actions=\(actions.map(\.id))",
+            defaults: defaults
+        )
+        for action in actions {
             let menuItem = menu.addItem(
                 withTitle: action.name,
                 action: #selector(runFinderAction(_:)),
@@ -54,9 +61,19 @@ final class FinderSync: FIFinderSync {
     }
 
     @objc private func runFinderAction(_ sender: NSMenuItem) {
-        guard let actionID = sender.representedObject as? String,
-              let selectedTargetURL = targetURL()
-        else { return }
+        guard let actionID = sender.representedObject as? String else {
+            Diagnostics.log("Menu item has no action id", defaults: AppConstants.sharedDefaults)
+            return
+        }
+        guard let selectedTargetURL = targetURL() else {
+            Diagnostics.log("Finder did not provide a target URL", defaults: AppConstants.sharedDefaults)
+            return
+        }
+
+        Diagnostics.log(
+            "Menu action selected id=\(actionID), target=\(selectedTargetURL.path)",
+            defaults: AppConstants.sharedDefaults
+        )
 
         var components = URLComponents()
         components.scheme = AppConstants.urlScheme
@@ -71,7 +88,14 @@ final class FinderSync: FIFinderSync {
             // The host is only a launcher. Activating it would make Finder lose
             // focus once before Alacritty or Code becomes the foreground app.
             configuration.activates = false
-            NSWorkspace.shared.open(url, configuration: configuration)
+            NSWorkspace.shared.open(url, configuration: configuration) { _, error in
+                if let error {
+                    Diagnostics.log(
+                        "Failed to open host URL: \(error.localizedDescription)",
+                        defaults: AppConstants.sharedDefaults
+                    )
+                }
+            }
         }
     }
 
@@ -84,7 +108,7 @@ final class FinderSync: FIFinderSync {
     }
 
     private func monitoredDirectoryURLs() -> Set<URL> {
-        let defaults = UserDefaults(suiteName: AppConstants.extensionBundleIdentifier) ?? .standard
+        let defaults = AppConstants.sharedDefaults
         if defaults.bool(forKey: AppConstants.monitoredDirectoriesConfiguredKey) {
             let paths = defaults.stringArray(forKey: AppConstants.monitoredDirectoriesKey) ?? []
             let configuredURLs = Set(paths.map {
@@ -134,7 +158,12 @@ final class FinderSync: FIFinderSync {
     }
 
     private func refreshMonitoredDirectoryURLs() {
-        controller.directoryURLs = monitoredDirectoryURLs()
+        let urls = monitoredDirectoryURLs()
+        controller.directoryURLs = urls
+        Diagnostics.log(
+            "Registered monitored directories: \(urls.map(\.path).sorted())",
+            defaults: AppConstants.sharedDefaults
+        )
     }
 
     @objc private func volumesDidChange(_ notification: Notification) {

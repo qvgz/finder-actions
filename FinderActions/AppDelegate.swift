@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         openedFromFinder = true
+        Diagnostics.log("Host received \(urls.count) URL request(s)", defaults: AppConstants.sharedDefaults)
 
         for url in urls where url.scheme == AppConstants.urlScheme {
             FinderActionRunner.run(url: url)

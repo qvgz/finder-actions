@@ -126,7 +126,7 @@ Finder Sync 扩展必须启用 App Sandbox。点击菜单项时，扩展通过�
 
 首次运行默认监控当前用户主目录、`/Applications` 和 `/Volumes`。用户保存自定义列表后，扩展严格使用该列表；空列表也是有效配置。外置卷可通过 `/Volumes` 的子目录递归覆盖，不必将单个卷注册为监控根目录。Alacritty 通过 `open` 启动，Code 通过 Visual Studio Code 应用包内置的 `bin/code` 启动。
 
-操作和监控目录配置写入扩展的用户偏好域。宿主应用与扩展共同使用 `Shared/FinderActionDefinition.swift` 中的操作模型和存储格式；新增内置应用时只需添加操作定义及对应执行适配器。操作列表通常无需重启 Finder；监控目录在扩展启动时注册，修改后需要重启 Finder。
+操作和监控目录配置写入扩展自身的用户偏好域：宿主应用负责写入，沙盒中的 Finder 扩展通过自己的标准偏好读取，避免两个进程读取不同的配置副本。宿主应用与扩展共同使用 `Shared/FinderActionDefinition.swift` 中的操作模型和存储格式；新增内置应用时只需添加操作定义及对应执行适配器。操作列表通常无需重启 Finder；监控目录在扩展启动时注册，修改后需要重启 Finder。
 
 ## Finder Sync 限制
 
@@ -137,6 +137,8 @@ Finder Sync 不是通用的 Finder 菜单注入机制。macOS 对同一目录只
 - 开启 iCloud“桌面与文稿文件夹”后，`~/Desktop` 与 `~/Documents` 属于 File Provider 管理范围。
 
 遇到菜单缺失时，在“系统设置 → 通用 → 登录项与扩展 → Finder 扩展”中暂时关闭 Keka、OneDrive 等其他 Finder 扩展，然后执行 `killall Finder`。如果目录由 iCloud/OneDrive File Provider 管理，只能关闭相应的文件夹同步功能或改用普通本地目录；Finder Actions 代码无法绕过这一系统优先级。
+
+配置界面的“右键菜单没有出现？”区域提供“收集问题诊断信息”开关，默认关闭。开启后，Finder Actions 会通过 macOS 统一日志记录配置读取、菜单生成、右键目标和程序启动结果；日志可能包含本机文件路径。复现问题后点击“将诊断日志保存到桌面…”，即可生成 `Finder-Actions-Diagnostics-<时间>.log` 并发送给开发者。发送前可以先用文本编辑器检查内容，问题排查完成后建议关闭诊断开关。
 
 ## License
 

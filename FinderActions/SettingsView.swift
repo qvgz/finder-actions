@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var monitoredDirectories = SettingsView.initialMonitoredDirectories()
     @State private var directoriesNeedRestart = false
     @State private var troubleshootingExpanded = false
+    @State private var diagnosticsEnabled = Diagnostics.isEnabled(in: AppConstants.sharedDefaults)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -159,6 +160,24 @@ struct SettingsView: View {
                     Label("检测到旧版 Alacritty/Code 服务，建议从“~/Library/Services”中移除。", systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
                         .foregroundStyle(.orange)
+                }
+
+                Divider()
+
+                Toggle(
+                    "收集问题诊断信息",
+                    isOn: Binding(
+                        get: { diagnosticsEnabled },
+                        set: { setDiagnosticsEnabled($0) }
+                    )
+                )
+
+                Text("默认关闭。开启后会记录右键菜单、所选位置和启动结果，方便开发者远程判断问题。日志可能包含文件路径。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if diagnosticsEnabled {
+                    Button("将诊断日志保存到桌面…", action: exportDiagnosticLog)
                 }
 
                 Button("打开系统中的 Finder 扩展设置", action: openExtensionSettings)
@@ -406,6 +425,10 @@ struct SettingsView: View {
     private func saveFinderActions() {
         FinderActionStore.save(finderActions, to: AppConstants.sharedDefaults)
         CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
+        Diagnostics.log(
+            "Saved actions: \(finderActions.map(\.id))",
+            defaults: AppConstants.sharedDefaults
+        )
     }
 
     private func addDirectories() {
@@ -446,6 +469,10 @@ struct SettingsView: View {
         defaults.set(true, forKey: AppConstants.monitoredDirectoriesConfiguredKey)
         CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
         directoriesNeedRestart = true
+        Diagnostics.log(
+            "Saved display locations: \(monitoredDirectories)",
+            defaults: AppConstants.sharedDefaults
+        )
     }
 
     private func applyDirectoryChanges() {
@@ -470,6 +497,83 @@ struct SettingsView: View {
     private func openExtensionSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private func setDiagnosticsEnabled(_ enabled: Bool) {
+        let defaults = AppConstants.sharedDefaults
+        if !enabled {
+            Diagnostics.log("Diagnostics disabled by user", defaults: defaults)
+        }
+        defaults.set(enabled, forKey: Diagnostics.enabledKey)
+        CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
+        diagnosticsEnabled = enabled
+
+        if enabled {
+            Diagnostics.log(
+                "Diagnostics enabled; actions=\(finderActions.map(\.id)); locations=\(monitoredDirectories)",
+                defaults: defaults
+            )
+        }
+    }
+
+    private func exportDiagnosticLog() {
+        Diagnostics.log("Diagnostic log export requested", defaults: AppConstants.sharedDefaults)
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let fileName = "Finder-Actions-Diagnostics-\(formatter.string(from: Date())).log"
+        let logURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop", isDirectory: true)
+            .appendingPathComponent(fileName)
+
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let header = """
+        Finder Actions diagnostics
+        Exported: \(Date())
+        App version: \(version)
+        macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)
+        Enabled actions: \(finderActions.map(\.id).joined(separator: ", "))
+        Display locations: \(monitoredDirectories.joined(separator: ", "))
+
+        """
+
+        var openedFileHandle: FileHandle?
+        defer { try? openedFileHandle?.close() }
+
+        do {
+            try Data(header.utf8).write(to: logURL, options: .atomic)
+            let fileHandle = try FileHandle(forWritingTo: logURL)
+            openedFileHandle = fileHandle
+            try fileHandle.seekToEnd()
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+            process.arguments = [
+                "show",
+                "--last", "7d",
+                "--style", "compact",
+                "--predicate", "subsystem == \"\(Diagnostics.subsystem)\""
+            ]
+            process.standardOutput = fileHandle
+            process.standardError = fileHandle
+            try process.run()
+            process.waitUntilExit()
+            try fileHandle.close()
+            openedFileHandle = nil
+
+            guard process.terminationStatus == 0 else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+
+            NSWorkspace.shared.activateFileViewerSelecting([logURL])
+            showAlert(title: "诊断日志已保存", message: "文件已保存到桌面，可以直接发送给开发者。")
+        } catch {
+            try? FileManager.default.removeItem(at: logURL)
+            showAlert(
+                title: "无法保存诊断日志",
+                message: "请确认桌面可以正常写入，然后重试。错误：\(error.localizedDescription)"
+            )
+        }
     }
 
     private static func initialMonitoredDirectories() -> [String] {
