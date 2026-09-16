@@ -70,6 +70,13 @@ final class FinderSync: FIFinderSync {
             URL(fileURLWithPath: "/Volumes", isDirectory: true)
         ]
 
+        let volumeKeys: Set<URLResourceKey> = [.volumeIsLocalKey, .volumeIsBrowsableKey]
+        let mountedVolumes = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: Array(volumeKeys),
+            options: [.skipHiddenVolumes]
+        ) ?? []
+        urls.formUnion(mountedVolumes)
+
         guard let passwordEntry = getpwuid(getuid()) else { return urls }
 
         let homeURL = URL(

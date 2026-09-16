@@ -42,6 +42,8 @@ Finder Actions 是一个轻量的 macOS Finder Sync 扩展，可在 Finder 的�
    killall Finder
    ```
 
+8. 如果此前安装过 `Alacritty.workflow` 或 `Code.workflow`，请从 `~/Library/Services` 移除。旧 workflow 的菜单与 Finder Actions 同名，但不具备 Finder 空白区域的完整覆盖能力。
+
 宿主应用无需加入登录项，也无需保持运行，但不能删除或移出 `/Applications`，因为 Finder 扩展包含在应用包内。
 
 ## 从标签发布
@@ -62,7 +64,16 @@ git push origin v1.0.0
 5. 生成 zip 和 SHA-256 校验文件。
 6. 上传 Actions Artifact 并创建同标签的 GitHub Release。
 
-分支推送、Pull Request 和手动操作不会触发编译发布。
+正式发布工作流不会由分支推送、Pull Request 或手动操作触发；只有符合格式的版本标签会触发正式发布。
+
+## Dev 发布
+
+在 GitHub 的 **Actions → Build Dev Release → Run workflow** 中可手动执行开发构建。该工作流始终检出 `master`，并覆盖固定的预发布版本 `dev`：
+
+- Release 标签固定为 `dev`。
+- 下载文件固定为 `Finder-Actions-dev.zip`。
+- 应用版本为 `0.0.<GitHub run number>`。
+- 每次执行都会删除旧的 `dev` Release 和标签，再基于当前 `master` 创建新的 `dev`。
 
 ## 本地开发
 
@@ -80,6 +91,16 @@ Finder Sync 扩展必须启用 App Sandbox。点击菜单项时，扩展通过 `
 扩展显式监控当前用户主目录、常用用户目录、`/Applications` 和 `/Volumes`。Alacritty 通过 `open` 启动，Code 通过 Visual Studio Code 应用包内置的 `bin/code` 启动。
 
 配置写入扩展的用户偏好域，扩展每次构建右键菜单时读取，因此切换开关通常无需重启 Finder。
+
+## Finder Sync 限制
+
+Finder Sync 不是通用的 Finder 菜单注入机制。macOS 对同一目录只允许一个 Finder Sync 扩展有效控制，而且 File Provider 的优先级更高。因此：
+
+- Keka 等注册外层目录的 Finder 扩展可能阻止 Finder Actions 在本地目录和外置卷显示菜单。
+- OneDrive、iCloud Drive 等 File Provider 管理的目录不会交给 Finder Actions。
+- 开启 iCloud“桌面与文稿文件夹”后，`~/Desktop` 与 `~/Documents` 属于 File Provider 管理范围。
+
+遇到菜单缺失时，在“系统设置 → 通用 → 登录项与扩展 → Finder 扩展”中暂时关闭 Keka、OneDrive 等其他 Finder 扩展，然后执行 `killall Finder`。如果目录由 iCloud/OneDrive File Provider 管理，只能关闭相应的文件夹同步功能或改用普通本地目录；Finder Actions 代码无法绕过这一系统优先级。
 
 ## License
 
