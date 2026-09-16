@@ -48,31 +48,38 @@ final class FinderSync: FIFinderSync {
             "Building menu kind=\(menuKind.rawValue), actions=\(actions.map(\.id))",
             defaults: defaults
         )
-        for action in actions {
+        for (index, action) in actions.enumerated() {
             let menuItem = menu.addItem(
                 withTitle: action.name,
                 action: #selector(runFinderAction(_:)),
                 keyEquivalent: ""
             )
-            menuItem.representedObject = action.id
+            menuItem.tag = index
         }
 
         return menu.items.isEmpty ? nil : menu
     }
 
     @objc private func runFinderAction(_ sender: NSMenuItem) {
-        guard let actionID = sender.representedObject as? String else {
-            Diagnostics.log("Menu item has no action id", defaults: AppConstants.sharedDefaults)
+        let defaults = AppConstants.sharedDefaults
+        defaults.synchronize()
+        let actions = FinderActionStore.load(from: defaults)
+        guard actions.indices.contains(sender.tag) else {
+            Diagnostics.log(
+                "Menu item has invalid tag=\(sender.tag), title=\(sender.title), actions=\(actions.map(\.id))",
+                defaults: defaults
+            )
             return
         }
+        let actionID = actions[sender.tag].id
         guard let selectedTargetURL = targetURL() else {
-            Diagnostics.log("Finder did not provide a target URL", defaults: AppConstants.sharedDefaults)
+            Diagnostics.log("Finder did not provide a target URL", defaults: defaults)
             return
         }
 
         Diagnostics.log(
-            "Menu action selected id=\(actionID), target=\(selectedTargetURL.path)",
-            defaults: AppConstants.sharedDefaults
+            "Menu action selected tag=\(sender.tag), id=\(actionID), target=\(selectedTargetURL.path)",
+            defaults: defaults
         )
 
         var components = URLComponents()
