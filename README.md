@@ -90,7 +90,7 @@ git push origin v1.0.0
 
 ## Dev 发布
 
-在 GitHub 的 **Actions → Build Dev Release → Run workflow** 中可手动执行开发构建。该工作流始终检出 `master`，并覆盖固定的预发布版本 `dev`：
+每次向 `master` 推送提交时会自动执行开发构建，也可以在 GitHub 的 **Actions → Build Dev Release → Run workflow** 中手动执行。两种触发方式使用相同流程：始终检出 `master`，并覆盖固定的预发布版本 `dev`。
 
 - Release 标签固定为 `dev`。
 - 下载文件固定为 `Finder-Actions-dev.zip`。
