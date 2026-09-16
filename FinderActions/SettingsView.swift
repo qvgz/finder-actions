@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var codeEnabled = AppConstants.sharedDefaults.object(
         forKey: AppConstants.codeEnabledKey
     ) as? Bool ?? true
+    @State private var monitoredDirectories = SettingsView.initialMonitoredDirectories()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -27,6 +28,62 @@ struct SettingsView: View {
                         .onChange(of: codeEnabled) { value in
                             save(value, forKey: AppConstants.codeEnabledKey)
                         }
+                }
+                .padding(8)
+            }
+
+            GroupBox("监控目录") {
+                VStack(alignment: .leading, spacing: 10) {
+                    ScrollView {
+                        LazyVStack(spacing: 6) {
+                            if monitoredDirectories.isEmpty {
+                                Text("未配置监控目录，Finder 中不会显示操作菜单。")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(6)
+                            }
+                            ForEach(monitoredDirectories, id: \.self) { path in
+                                HStack(spacing: 8) {
+                                    Image(systemName: "folder")
+                                        .foregroundStyle(.secondary)
+                                    Text(path)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .help(path)
+                                    Spacer()
+                                    if !FileManager.default.fileExists(atPath: path) {
+                                        Text("不存在")
+                                            .font(.caption)
+                                            .foregroundStyle(.red)
+                                    }
+                                    Button {
+                                        removeDirectory(path)
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("移除监控目录")
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                            }
+                        }
+                    }
+                    .frame(height: 130)
+
+                    HStack {
+                        Button("添加目录…", action: addDirectories)
+                        Button("恢复推荐设置", action: restoreRecommendedDirectories)
+                        Spacer()
+                        Text("修改后需重启 Finder")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("直接注册的监控根目录在 Finder 收藏栏中可能显示 Finder Actions 图标。优先添加需要覆盖目录的父目录。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(8)
             }
@@ -53,18 +110,76 @@ struct SettingsView: View {
                         NSWorkspace.shared.open(url)
                     }
                 }
+                Button("重启 Finder", action: restartFinder)
                 Spacer()
                 Button("退出") { NSApp.terminate(nil) }
                     .keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)
-        .frame(width: 500, height: 440)
+        .frame(width: 620, height: 650)
     }
 
     private func save(_ value: Bool, forKey key: String) {
         AppConstants.sharedDefaults.set(value, forKey: key)
         CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
+    }
+
+    private func addDirectories() {
+        let panel = NSOpenPanel()
+        panel.title = "选择 Finder Actions 监控目录"
+        panel.prompt = "添加"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.canCreateDirectories = false
+        panel.resolvesAliases = true
+
+        guard panel.runModal() == .OK else { return }
+
+        let additions = panel.urls.map { $0.standardizedFileURL.path }
+        monitoredDirectories = Array(Set(monitoredDirectories + additions)).sorted()
+        saveMonitoredDirectories()
+    }
+
+    private func removeDirectory(_ path: String) {
+        monitoredDirectories.removeAll { $0 == path }
+        saveMonitoredDirectories()
+    }
+
+    private func restoreRecommendedDirectories() {
+        monitoredDirectories = Self.recommendedDirectories()
+        saveMonitoredDirectories()
+    }
+
+    private func saveMonitoredDirectories() {
+        let defaults = AppConstants.sharedDefaults
+        defaults.set(monitoredDirectories, forKey: AppConstants.monitoredDirectoriesKey)
+        defaults.set(true, forKey: AppConstants.monitoredDirectoriesConfiguredKey)
+        CFPreferencesAppSynchronize(AppConstants.extensionBundleIdentifier as CFString)
+    }
+
+    private func restartFinder() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        process.arguments = ["Finder"]
+        try? process.run()
+    }
+
+    private static func initialMonitoredDirectories() -> [String] {
+        let defaults = AppConstants.sharedDefaults
+        guard defaults.bool(forKey: AppConstants.monitoredDirectoriesConfiguredKey) else {
+            return recommendedDirectories()
+        }
+        return defaults.stringArray(forKey: AppConstants.monitoredDirectoriesKey) ?? []
+    }
+
+    private static func recommendedDirectories() -> [String] {
+        [
+            FileManager.default.homeDirectoryForCurrentUser.path,
+            "/Volumes",
+            "/Applications"
+        ]
     }
 
     private var legacyWorkflowsInstalled: Bool {

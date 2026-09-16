@@ -5,4 +5,6 @@ enum AppConstants {
     static let urlScheme = "finder-actions"
     static let alacrittyEnabledKey = "alacrittyEnabled"
     static let codeEnabledKey = "codeEnabled"
+    static let monitoredDirectoriesKey = "monitoredDirectories"
+    static let monitoredDirectoriesConfiguredKey = "monitoredDirectoriesConfigured"
 }

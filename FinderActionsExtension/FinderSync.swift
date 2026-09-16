@@ -65,17 +65,18 @@ final class FinderSync: FIFinderSync {
     }
 
     private func monitoredDirectoryURLs() -> Set<URL> {
+        let defaults = UserDefaults(suiteName: AppConstants.extensionBundleIdentifier) ?? .standard
+        if defaults.bool(forKey: AppConstants.monitoredDirectoriesConfiguredKey) {
+            let paths = defaults.stringArray(forKey: AppConstants.monitoredDirectoriesKey) ?? []
+            return Set(paths.map {
+                URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+            })
+        }
+
         var urls: Set<URL> = [
             URL(fileURLWithPath: "/Applications", isDirectory: true),
             URL(fileURLWithPath: "/Volumes", isDirectory: true)
         ]
-
-        let volumeKeys: Set<URLResourceKey> = [.volumeIsLocalKey, .volumeIsBrowsableKey]
-        let mountedVolumes = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: Array(volumeKeys),
-            options: [.skipHiddenVolumes]
-        ) ?? []
-        urls.formUnion(mountedVolumes)
 
         guard let passwordEntry = getpwuid(getuid()) else { return urls }
 
@@ -84,10 +85,6 @@ final class FinderSync: FIFinderSync {
             isDirectory: true
         )
         urls.insert(homeURL)
-
-        for name in ["Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public"] {
-            urls.insert(homeURL.appendingPathComponent(name, isDirectory: true))
-        }
 
         return urls
     }

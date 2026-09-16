@@ -34,7 +34,7 @@ Finder Actions 是一个轻量的 macOS Finder Sync 扩展，可在 Finder 的�
    open "/Applications/Finder Actions.app"
    ```
 
-5. 在应用中选择需要显示的 Alacritty 和 Code 操作。
+5. 在应用中选择需要显示的 Alacritty 和 Code 操作，并配置监控目录。
 6. 打开“系统设置 → 通用 → 登录项与扩展 → Finder 扩展”，启用 **FinderActionsExtension**。
 7. 如果菜单没有立即出现，运行：
 
@@ -45,6 +45,18 @@ Finder Actions 是一个轻量的 macOS Finder Sync 扩展，可在 Finder 的�
 8. 如果此前安装过 `Alacritty.workflow` 或 `Code.workflow`，请从 `~/Library/Services` 移除。旧 workflow 的菜单与 Finder Actions 同名，但不具备 Finder 空白区域的完整覆盖能力。
 
 宿主应用无需加入登录项，也无需保持运行，但不能删除或移出 `/Applications`，因为 Finder 扩展包含在应用包内。
+
+## 配置监控目录
+
+应用的“监控目录”区域支持：
+
+- 一次选择一个或多个目录添加到监控列表。
+- 单独移除不再需要的目录。
+- 删除全部目录以完全停止显示 Finder 菜单。
+- 恢复推荐设置：当前用户主目录、`/Volumes`、`/Applications`。
+- 标记当前不存在或尚未挂载的目录。
+
+修改目录后点击“重启 Finder”使配置生效。直接注册为监控根的目录在 Finder 收藏栏中可能显示 Finder Actions 图标，因此应优先添加需要覆盖目录的父目录。例如监控所有外置卷时添加 `/Volumes`，不要逐个添加 `/Volumes/pd`。
 
 ## 从标签发布
 
@@ -88,9 +100,9 @@ git push origin v1.0.0
 
 Finder Sync 扩展必须启用 App Sandbox。点击菜单项时，扩展通过 `finder-actions://` URL 唤醒宿主应用；宿主应用使用 Launch Services 启动目标程序后立即退出。这避免了从扩展沙盒直接运行外部可执行文件。
 
-扩展显式监控当前用户主目录、常用用户目录、`/Applications` 和 `/Volumes`。Alacritty 通过 `open` 启动，Code 通过 Visual Studio Code 应用包内置的 `bin/code` 启动。
+首次运行默认监控当前用户主目录、`/Applications` 和 `/Volumes`。用户保存自定义列表后，扩展严格使用该列表；空列表也是有效配置。外置卷可通过 `/Volumes` 的子目录递归覆盖，不必将单个卷注册为监控根目录。Alacritty 通过 `open` 启动，Code 通过 Visual Studio Code 应用包内置的 `bin/code` 启动。
 
-配置写入扩展的用户偏好域，扩展每次构建右键菜单时读取，因此切换开关通常无需重启 Finder。
+配置写入扩展的用户偏好域。Alacritty/Code 开关通常无需重启 Finder；监控目录在扩展启动时注册，修改后需要重启 Finder。
 
 ## Finder Sync 限制
 
