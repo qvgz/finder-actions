@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import FinderSync
 
 final class FinderSync: FIFinderSync {
@@ -6,7 +7,7 @@ final class FinderSync: FIFinderSync {
 
     override init() {
         super.init()
-        controller.directoryURLs = [URL(fileURLWithPath: "/", isDirectory: true)]
+        controller.directoryURLs = monitoredDirectoryURLs()
     }
 
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
@@ -53,14 +54,34 @@ final class FinderSync: FIFinderSync {
 
     private func targetDirectoryURL() -> URL? {
         if let selectedURL = controller.selectedItemURLs()?.first {
-            var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: selectedURL.path, isDirectory: &isDirectory),
-               isDirectory.boolValue {
+            let resourceValues = try? selectedURL.resourceValues(forKeys: [.isDirectoryKey])
+            if selectedURL.hasDirectoryPath || resourceValues?.isDirectory == true {
                 return selectedURL
             }
             return selectedURL.deletingLastPathComponent()
         }
 
         return controller.targetedURL()
+    }
+
+    private func monitoredDirectoryURLs() -> Set<URL> {
+        var urls: Set<URL> = [
+            URL(fileURLWithPath: "/Applications", isDirectory: true),
+            URL(fileURLWithPath: "/Volumes", isDirectory: true)
+        ]
+
+        guard let passwordEntry = getpwuid(getuid()) else { return urls }
+
+        let homeURL = URL(
+            fileURLWithPath: String(cString: passwordEntry.pointee.pw_dir),
+            isDirectory: true
+        )
+        urls.insert(homeURL)
+
+        for name in ["Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public"] {
+            urls.insert(homeURL.appendingPathComponent(name, isDirectory: true))
+        }
+
+        return urls
     }
 }

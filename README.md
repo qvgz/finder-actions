@@ -2,6 +2,8 @@
 
 Finder Actions 是一个轻量的 macOS Finder Sync 扩展，可在 Finder 的空白区域、文件和文件夹右键菜单中显示自定义操作。
 
+![示例图](example.png)
+
 当前操作：
 
 - **Alacritty**：在目标目录中打开 Alacritty。
@@ -74,6 +76,8 @@ git push origin v1.0.0
 ## 架构说明
 
 Finder Sync 扩展必须启用 App Sandbox。点击菜单项时，扩展通过 `finder-actions://` URL 唤醒宿主应用；宿主应用使用 Launch Services 启动目标程序后立即退出。这避免了从扩展沙盒直接运行外部可执行文件。
+
+扩展显式监控当前用户主目录、常用用户目录、`/Applications` 和 `/Volumes`。Alacritty 通过 `open` 启动，Code 通过 Visual Studio Code 应用包内置的 `bin/code` 启动。
 
 配置写入扩展的用户偏好域，扩展每次构建右键菜单时读取，因此切换开关通常无需重启 Finder。
 

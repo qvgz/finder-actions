@@ -43,12 +43,12 @@ enum FinderActionRunner {
             ?? URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
         guard FileManager.default.fileExists(atPath: applicationURL.path) else { return }
 
-        let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = true
-        workspace.open(
-            [directoryURL],
-            withApplicationAt: applicationURL,
-            configuration: configuration
-        ) { _, _ in }
+        let codeCLI = applicationURL.appendingPathComponent("Contents/Resources/app/bin/code")
+        guard FileManager.default.isExecutableFile(atPath: codeCLI.path) else { return }
+
+        let process = Process()
+        process.executableURL = codeCLI
+        process.arguments = [directoryURL.path]
+        try? process.run()
     }
 }
