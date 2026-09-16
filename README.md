@@ -1,118 +1,120 @@
 # Finder Actions
 
-Finder Actions 为 macOS Finder 增加实用的右键功能。你可以在 Finder 的空白区域、文件或文件夹上点击右键，然后使用 Alacritty、Visual Studio Code 或自己添加的脚本处理当前位置。
+English | [简体中文](README-zh.md)
 
-![Finder Actions 示例](example.png)
+Finder Actions adds useful context-menu actions to macOS Finder. Right-click the background of a Finder window, a file, or a folder to open that location in Alacritty or Visual Studio Code, or to run your own scripts.
 
-应用默认提供：
+![Finder Actions](example.png)
 
-- **Alacritty**：在当前文件夹打开 Alacritty。
-- **Code**：在当前文件夹打开 Visual Studio Code。
-- **自定义脚本**：按自己的需要增加更多右键功能。
+Built-in actions include:
 
-支持 macOS 13 Ventura 或更高版本。
+- **Alacritty** — open the current folder in Alacritty.
+- **Code** — open the current folder in Visual Studio Code.
+- **Custom scripts** — add your own Finder actions without modifying the app.
 
-## 安装
+Finder Actions requires macOS 13 Ventura or later.
 
-1. 从 [Releases](../../releases) 下载最新的 `Finder-Actions-<版本>.zip`。
-2. 解压后，将 `Finder Actions.app` 移动到“应用程序”文件夹。
-3. 打开“终端”，运行：
+## Installation
+
+1. Download the latest `Finder-Actions-<version>.zip` from [Releases](../../releases).
+2. Unzip it and move `Finder Actions.app` to `/Applications`.
+3. Open Terminal and remove the download quarantine attribute:
 
    ```bash
    xattr -dr com.apple.quarantine "/Applications/Finder Actions.app"
    ```
 
-4. 打开一次 Finder Actions。
-5. 前往“系统设置 → 通用 → 登录项与扩展 → Finder 扩展”，启用 **FinderActionsExtension**。
-6. 回到 Finder。如果右键功能没有立即出现，请重新打开 Finder：
+4. Open Finder Actions once.
+5. Go to **System Settings → General → Login Items & Extensions → Finder Extensions**, then enable **FinderActionsExtension**.
+6. Return to Finder. If the actions do not appear immediately, restart Finder:
 
    ```bash
    killall Finder
    ```
 
-Finder Actions 不需要加入登录项，也不需要保持窗口打开。请不要删除或移走“应用程序”文件夹中的 App，否则 Finder 扩展将无法使用。
+Finder Actions does not need to run at login or remain open. Keep the app in `/Applications`; moving or deleting it will also remove its Finder extension.
 
-## 设置右键功能
+## Choose Your Finder Actions
 
-打开 Finder Actions 后：
+Open Finder Actions, then:
 
-1. 在“选择右键功能”中查看当前已经启用的功能。
-2. 点击“添加右键功能”，加入尚未启用的功能。
-3. 拖动功能右侧的三横线把手，调整它在 Finder 右键菜单中的顺序。
-4. 点击功能右侧的减号，将它从 Finder 右键菜单移除。
+1. Review the actions currently shown in the **Choose Finder Actions** list.
+2. Click **Add Finder Action** to enable another available action.
+3. Drag the three-line handle beside an action to change its position in Finder's context menu.
+4. Click the minus button to remove an action from the context menu.
 
-排序和其他功能列表变化会自动保存，通常不需要重新打开 Finder。移除功能不会删除对应脚本，以后仍可重新添加。
+Changes, including action order, are saved automatically and normally do not require restarting Finder. Removing an action does not delete its script, so you can add it again later.
 
-## 设置显示位置
+## Choose Where Actions Appear
 
-在“选择显示位置”中决定右键功能可以在哪里出现：
+Use **Choose Locations** to control where the context-menu actions are available:
 
-- 点击“添加位置”选择一个或多个文件夹。
-- 点击位置右侧的减号停止监控该位置。
-- 点击“使用推荐位置”恢复个人文件夹、外置磁盘和“应用程序”文件夹。
+- Click **Add Location** to select one or more folders.
+- Click the minus button beside a location to stop monitoring it.
+- Click **Use Recommended Locations** to restore your home folder, external volumes, and the Applications folder.
 
-右键功能也会出现在所选位置的子文件夹中。修改位置后，请点击“应用位置更改”或“应用并完成”，应用会自动重新打开 Finder。
+Actions also appear in subfolders of each selected location. After changing locations, click **Apply Location Changes** or **Apply and Done**. Finder Actions will restart Finder for you.
 
-对于外置磁盘，建议添加 `/Volumes`，不要逐个添加具体宗卷。这样新连接的磁盘也能正常使用右键功能。
+For external drives, add `/Volumes` instead of adding each individual volume. This also covers drives mounted in the future.
 
-## 使用右键功能
+## How Targets Are Passed to Actions
 
-- 右键文件夹：脚本收到该文件夹的绝对路径。
-- 右键文件：脚本收到该文件的绝对路径。
-- 右键 Finder 空白区域：脚本收到当前文件夹的绝对路径。
+- Right-click a folder: the script receives that folder's absolute path.
+- Right-click a file: the script receives that file's absolute path.
+- Right-click the background of a Finder window: the script receives the current folder's absolute path.
 
-默认的 Alacritty 和 Code 功能会在目标是文件时自动使用文件所在的文件夹。
+The built-in Alacritty and Code actions automatically use the containing folder when the selected target is a file.
 
-## 添加自己的脚本
+## Add a Custom Script
 
-只添加来源可信的脚本。
+Only add scripts from sources you trust.
 
-在“添加右键功能”中选择“添加自定义脚本”，应用会复制脚本并自动设置运行权限。脚本需要满足以下格式：
+Choose **Add Finder Action → Add Custom Script**. Finder Actions copies the script into its managed actions folder and makes it executable. A script must begin with this structure:
 
 ```bash
 #!/bin/bash
-# 这里填写显示给用户的功能说明
+# Describe what this action does for the user
 ```
 
-- 文件名去掉最后一个后缀后，就是右键菜单名称。例如 `New Text.sh` 显示为“New Text”。
-- 第一行必须是 Shebang。
-- 第二行必须是功能说明注释。
-- Finder 中的目标绝对路径通过第一个参数 `$1` 传给脚本。
+- The filename without its final extension becomes the context-menu title. For example, `New Text.sh` appears as “New Text.”
+- The first line must be a shebang.
+- The second line must be a comment describing the action.
+- The Finder target's absolute path is passed as the first argument, `$1`.
 
-也可以通过“添加右键功能 → 打开脚本文件夹”管理脚本。手动新增或修改后，点击同一菜单中的“刷新功能列表”。不符合格式或安全要求的文件会被自动忽略。
+You can also choose **Add Finder Action → Open Scripts Folder** to manage scripts directly. After adding or editing a script there, choose **Refresh Action List** from the same menu. Finder Actions automatically ignores files that do not meet its format or security requirements.
 
-## 常见问题
+## Troubleshooting
 
-### 右键菜单没有出现
+### The context-menu actions do not appear
 
-依次检查：
+Check the following:
 
-1. 系统设置中是否已经启用 **FinderActionsExtension**。
-2. 当前目录是否位于应用设置的显示位置中。
-3. 是否安装过会接管 Finder 右键菜单的其他扩展，例如 Keka。
-4. 当前目录是否由 iCloud Drive、OneDrive 等云盘管理。
+1. **FinderActionsExtension** is enabled in System Settings.
+2. The current folder is inside one of the locations configured in Finder Actions.
+3. Another Finder extension, such as Keka, is not taking control of the same location.
+4. The folder is not managed by a cloud provider such as iCloud Drive or OneDrive.
 
-macOS 可能优先使用其他 Finder 扩展或云盘扩展。可以暂时关闭相关扩展后运行 `killall Finder` 再试。Finder Actions 无法在被 File Provider 完全接管的目录中强制显示菜单。
+macOS may give another Finder extension or File Provider priority. Temporarily disable competing extensions and run `killall Finder` to try again. Finder Actions cannot force its menu into a location fully managed by a File Provider.
 
-如果以前安装过 `Alacritty.workflow` 或 `Code.workflow`，请从 `~/Library/Services` 删除它们，避免出现名称相同的旧菜单。
+If you previously installed `Alacritty.workflow` or `Code.workflow`, remove them from `~/Library/Services` to avoid duplicate legacy actions.
 
-### 外置磁盘在收藏栏中的图标变了
+### An external drive has a Finder Actions icon in the sidebar
 
-Finder 会为扩展直接监控的位置显示 Finder Actions 图标。跨宗卷稳定显示右键功能和完全保留宗卷原始动态图标无法同时保证。
+Finder displays the extension's icon for locations registered directly as monitoring roots. Reliable context-menu support across mounted volumes and complete preservation of each volume's original dynamic icon cannot both be guaranteed.
 
-如果希望收藏栏显示普通图标，可以创建宗卷的软链接，再收藏该软链接：
+To keep a standard sidebar icon, create a symbolic link to the volume and add the link to Finder's sidebar instead:
 
 ```bash
 ln -s /Volumes/pd ~/pd-link
 ```
 
-请按实际宗卷名称修改命令，并确认目标链接尚不存在。
+Replace `pd` with the actual volume name and make sure the destination link does not already exist.
 
-### 如何生成诊断日志
+### Export a diagnostic log
 
-展开应用底部的“右键菜单没有出现？”，开启“收集问题诊断信息”，然后重新操作一次出现问题的右键功能。
+Expand **Context menu not showing?** at the bottom of Finder Actions and enable **Collect Diagnostic Information**. Reproduce the problem once, then click **Save Diagnostic Log to Desktop**.
 
-点击“将诊断日志保存到桌面”后，将生成的 `Finder-Actions-Diagnostics-<时间>.log` 发给开发者。日志可能包含本机文件路径和脚本输出，发送前可以先用文本编辑器检查。问题解决后建议关闭诊断开关。
+Send the generated `Finder-Actions-Diagnostics-<timestamp>.log` file to the developer. The log may contain local file paths and script output, so review it in a text editor before sharing. Disable diagnostics after troubleshooting.
 
 ## License
 
