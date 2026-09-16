@@ -2,11 +2,30 @@ import AppKit
 import SwiftUI
 
 struct SettingsView: View {
-    @State private var finderActions = FinderActionStore.load(from: AppConstants.sharedDefaults)
+    @State private var finderActions: [FinderActionDefinition]
+    @State private var availableActions: [FinderActionDefinition]
     @State private var monitoredDirectories = SettingsView.initialMonitoredDirectories()
     @State private var directoriesNeedRestart = false
     @State private var troubleshootingExpanded = false
     @State private var diagnosticsEnabled = Diagnostics.isEnabled(in: AppConstants.sharedDefaults)
+
+    init() {
+        try? ScriptCatalog.prepareActionsDirectory()
+        let catalog = ScriptCatalog.availableActions()
+        let defaults = AppConstants.sharedDefaults
+        let stored = FinderActionStore.load(from: defaults)
+        let catalogByID = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
+        let enabledActions: [FinderActionDefinition]
+        if defaults.data(forKey: FinderActionStore.actionsKey) == nil {
+            enabledActions = catalog
+        } else {
+            enabledActions = stored.compactMap { catalogByID[$0.id] }
+        }
+        FinderActionStore.save(enabledActions, to: defaults)
+        CFPreferencesAppSynchronize(AppConstants.sharedPreferencesDomain as CFString)
+        _finderActions = State(initialValue: enabledActions)
+        _availableActions = State(initialValue: catalog)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,7 +77,7 @@ struct SettingsView: View {
                     emptyState(
                         icon: "cursorarrow.rays",
                         title: "还没有右键功能",
-                        message: "点击下方按钮添加 Alacritty、Code 或自定义脚本。"
+                        message: "点击下方按钮，选择要显示在右键菜单中的功能。"
                     )
                 } else {
                     ForEach(finderActions) { action in
@@ -69,20 +88,24 @@ struct SettingsView: View {
 
             HStack {
                 Menu {
-                    ForEach(availableApplications) { action in
+                    ForEach(disabledActions) { action in
                         Button {
                             addFinderAction(action)
                         } label: {
-                            Label(addActionTitle(action), systemImage: "app")
+                            Label(action.name, systemImage: "plus")
                         }
                     }
 
-                    if !availableApplications.isEmpty {
+                    if !disabledActions.isEmpty {
                         Divider()
                     }
 
                     Button(action: addScript) {
                         Label("添加自定义脚本（高级）…", systemImage: "scroll")
+                    }
+
+                    Button(action: ScriptCatalog.revealActionsDirectory) {
+                        Label("打开脚本文件夹", systemImage: "folder")
                     }
                 } label: {
                     Label("添加右键功能", systemImage: "plus")
@@ -201,9 +224,9 @@ struct SettingsView: View {
         }
     }
 
-    private var availableApplications: [FinderActionDefinition] {
+    private var disabledActions: [FinderActionDefinition] {
         let enabledIDs = Set(finderActions.map(\.id))
-        return FinderActionDefinition.supportedApplications.filter { !enabledIDs.contains($0.id) }
+        return availableActions.filter { !enabledIDs.contains($0.id) }
     }
 
     private func settingsCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -264,16 +287,16 @@ struct SettingsView: View {
 
     private func actionRow(_ action: FinderActionDefinition) -> some View {
         HStack(spacing: 11) {
-            Image(systemName: action.kind == .script ? "scroll" : "app.fill")
+            Image(systemName: "scroll.fill")
                 .font(.system(size: 17))
-                .foregroundStyle(action.kind == .script ? Color.orange : Color.blue)
+                .foregroundStyle(Color.blue)
                 .frame(width: 30, height: 30)
                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(action.name)
                     .fontWeight(.medium)
-                Text(actionSubtitle(action))
+                Text(action.summary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -282,8 +305,9 @@ struct SettingsView: View {
 
             Spacer()
 
-            if let scriptPath = action.scriptPath,
-               !FileManager.default.isExecutableFile(atPath: scriptPath) {
+            if ScriptCatalog.scriptURL(for: action).map({
+                !FileManager.default.isExecutableFile(atPath: $0.path)
+            }) ?? true {
                 Text("无法使用")
                     .font(.caption)
                     .foregroundStyle(.red)
@@ -342,17 +366,6 @@ struct SettingsView: View {
         .frame(minHeight: 52)
     }
 
-    private func addActionTitle(_ action: FinderActionDefinition) -> String {
-        "在 \(action.name) 中打开"
-    }
-
-    private func actionSubtitle(_ action: FinderActionDefinition) -> String {
-        if let scriptPath = action.scriptPath {
-            return "运行自定义脚本 · \(scriptPath)"
-        }
-        return "使用 \(action.name) 打开当前文件夹"
-    }
-
     private func directoryName(_ path: String) -> String {
         switch path {
         case FileManager.default.homeDirectoryForCurrentUser.path: return "个人文件夹"
@@ -389,7 +402,7 @@ struct SettingsView: View {
     private func addScript() {
         let panel = NSOpenPanel()
         panel.title = "选择要添加的脚本"
-        panel.message = "脚本将在右键菜单中显示，并接收所选文件或文件夹的位置。"
+        panel.message = "文件名会显示在右键菜单中。脚本第一行需为 Shebang，第二行需为功能说明注释。"
         panel.prompt = "添加脚本"
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
@@ -397,21 +410,14 @@ struct SettingsView: View {
         panel.resolvesAliases = true
 
         guard panel.runModal() == .OK, let selectedURL = panel.url else { return }
-        let path = selectedURL.standardizedFileURL.path
-        guard FileManager.default.isExecutableFile(atPath: path) else {
-            showAlert(
-                title: "无法添加这个脚本",
-                message: "脚本没有运行权限。请联系脚本提供者，或为它添加执行权限后重试。"
-            )
-            return
+        do {
+            let action = try ScriptCatalog.importScript(at: selectedURL.standardizedFileURL)
+            availableActions = ScriptCatalog.availableActions()
+            finderActions.append(action)
+            saveFinderActions()
+        } catch {
+            showAlert(title: "无法添加这个脚本", message: error.localizedDescription)
         }
-        guard !finderActions.contains(where: { $0.scriptPath == path }) else {
-            showAlert(title: "这个脚本已经添加", message: "无需重复添加，可以直接在 Finder 右键菜单中使用。")
-            return
-        }
-
-        finderActions.append(.script(path: path))
-        saveFinderActions()
     }
 
     private func showAlert(title: String, message: String) {
