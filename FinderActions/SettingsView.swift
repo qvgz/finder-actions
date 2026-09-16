@@ -1,10 +1,12 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @State private var finderActions: [FinderActionDefinition]
     @State private var availableActions: [FinderActionDefinition]
     @State private var actionsStatusMessage: String
+    @State private var draggingActionID: String?
     @State private var monitoredDirectories = SettingsView.initialMonitoredDirectories()
     @State private var directoriesNeedRestart = false
     @State private var troubleshootingExpanded = false
@@ -41,6 +43,7 @@ struct SettingsView: View {
         _actionsStatusMessage = State(
             initialValue: preparationError == nil ? "更改会自动保存" : "功能文件夹暂时无法读取"
         )
+        _draggingActionID = State(initialValue: nil)
     }
 
     var body: some View {
@@ -331,6 +334,18 @@ struct SettingsView: View {
                     .foregroundStyle(.red)
             }
 
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 30)
+                .contentShape(Rectangle())
+                .onDrag {
+                    draggingActionID = action.id
+                    return NSItemProvider(object: action.id as NSString)
+                }
+                .accessibilityLabel("调整 \(action.name) 的顺序")
+                .help("拖动调整右键菜单顺序")
+
             Button {
                 removeFinderAction(action)
             } label: {
@@ -342,6 +357,15 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 52)
+        .onDrop(
+            of: [UTType.text],
+            delegate: FinderActionDropDelegate(
+                destinationID: action.id,
+                actions: $finderActions,
+                draggingActionID: $draggingActionID,
+                save: saveFinderActions
+            )
+        )
     }
 
     private func directoryRow(_ path: String) -> some View {
@@ -640,5 +664,38 @@ struct SettingsView: View {
         return ["Alacritty.workflow", "Code.workflow"].contains { name in
             FileManager.default.fileExists(atPath: servicesURL.appendingPathComponent(name).path)
         }
+    }
+}
+
+private struct FinderActionDropDelegate: DropDelegate {
+    let destinationID: String
+    @Binding var actions: [FinderActionDefinition]
+    @Binding var draggingActionID: String?
+    let save: () -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingActionID,
+              draggingActionID != destinationID,
+              let sourceIndex = actions.firstIndex(where: { $0.id == draggingActionID }),
+              let destinationIndex = actions.firstIndex(where: { $0.id == destinationID })
+        else { return }
+
+        withAnimation(.easeInOut(duration: 0.15)) {
+            actions.move(
+                fromOffsets: IndexSet(integer: sourceIndex),
+                toOffset: destinationIndex > sourceIndex ? destinationIndex + 1 : destinationIndex
+            )
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard draggingActionID != nil else { return false }
+        draggingActionID = nil
+        save()
+        return true
     }
 }
