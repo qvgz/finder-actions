@@ -4,7 +4,10 @@ English | [简体中文](README-zh.md)
 
 Finder Actions adds useful context-menu actions to macOS Finder. Right-click the background of a Finder window, a file, or a folder to open that location in Alacritty or Visual Studio Code, or to run your own scripts.
 
-![Finder Actions](example.png)
+<p align="center">
+  <img src="example.png" alt="Finder Actions settings" width="48%">
+  <img src="example2.png" alt="Choosing a Finder action" width="48%">
+</p>
 
 Built-in actions include:
 

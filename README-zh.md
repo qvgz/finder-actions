@@ -4,7 +4,10 @@
 
 Finder Actions 为 macOS Finder 增加实用的右键功能。你可以在 Finder 的空白区域、文件或文件夹上点击右键，然后使用 Alacritty、Visual Studio Code 或自己添加的脚本处理当前位置。
 
-![Finder Actions 示例](example-zh.png)
+<p align="center">
+  <img src="example-zh.png" alt="Finder Actions 设置界面" width="48%">
+  <img src="example2-zh.png" alt="选择 Finder 右键功能" width="48%">
+</p>
 
 应用默认提供：
 
