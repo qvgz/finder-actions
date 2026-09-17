@@ -13,7 +13,6 @@ struct SettingsView: View {
     @State private var actionsStatusMessage: String
     @State private var draggingActionID: String?
     @State private var interfaceLanguage: InterfaceLanguage
-    @State private var languageSelectionPresented: Bool
     @State private var monitoredDirectories = SettingsView.initialMonitoredDirectories()
     @State private var directoriesNeedRestart = false
     @State private var troubleshootingExpanded = false
@@ -23,7 +22,7 @@ struct SettingsView: View {
         let defaults = AppConstants.sharedDefaults
         let savedLanguage = defaults.string(forKey: AppConstants.interfaceLanguageKey)
             .flatMap { InterfaceLanguage(rawValue: $0) }
-        let initialLanguage = savedLanguage ?? .english
+        let initialLanguage = savedLanguage ?? Self.systemDefaultLanguage()
         let stored = FinderActionStore.load(from: defaults)
         let catalog: [FinderActionDefinition]
         let preparationError: Error?
@@ -57,7 +56,6 @@ struct SettingsView: View {
         )
         _draggingActionID = State(initialValue: nil)
         _interfaceLanguage = State(initialValue: initialLanguage)
-        _languageSelectionPresented = State(initialValue: savedLanguage == nil)
     }
 
     var body: some View {
@@ -79,13 +77,6 @@ struct SettingsView: View {
                 .padding(.vertical, 16)
         }
         .frame(width: 680, height: 760)
-        .sheet(isPresented: $languageSelectionPresented) {
-            FirstLaunchLanguageView { language in
-                setInterfaceLanguage(language)
-                languageSelectionPresented = false
-            }
-            .interactiveDismissDisabled()
-        }
     }
 
     private var header: some View {
@@ -799,6 +790,15 @@ struct SettingsView: View {
         return defaults.stringArray(forKey: AppConstants.monitoredDirectoriesKey) ?? []
     }
 
+    private static func systemDefaultLanguage() -> InterfaceLanguage {
+        guard let identifier = Locale.preferredLanguages.first?.lowercased() else {
+            return .english
+        }
+        return identifier == "zh" || identifier.hasPrefix("zh-") || identifier.hasPrefix("zh_")
+            ? .simplifiedChinese
+            : .english
+    }
+
     private static func recommendedDirectories() -> [String] {
         [FileManager.default.homeDirectoryForCurrentUser.path, "/Volumes", "/Applications"]
     }
@@ -809,63 +809,6 @@ struct SettingsView: View {
         return ["Alacritty.workflow", "Code.workflow"].contains { name in
             FileManager.default.fileExists(atPath: servicesURL.appendingPathComponent(name).path)
         }
-    }
-}
-
-private struct FirstLaunchLanguageView: View {
-    let select: (InterfaceLanguage) -> Void
-
-    var body: some View {
-        VStack(spacing: 22) {
-            Image(systemName: "globe")
-                .font(.system(size: 42))
-                .foregroundStyle(.blue)
-
-            VStack(spacing: 6) {
-                Text("Choose your language")
-                    .font(.title2.bold())
-                Text("选择语言")
-                    .font(.title3.bold())
-                Text("Select the language used in Finder Actions.\n选择 Finder Actions 使用的界面语言。")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            HStack(spacing: 14) {
-                languageButton(
-                    title: "English",
-                    subtitle: "Use English",
-                    language: .english
-                )
-                languageButton(
-                    title: "中文（简体）",
-                    subtitle: "使用中文",
-                    language: .simplifiedChinese
-                )
-            }
-        }
-        .padding(32)
-        .frame(width: 480)
-    }
-
-    private func languageButton(
-        title: String,
-        subtitle: String,
-        language: InterfaceLanguage
-    ) -> some View {
-        Button {
-            select(language)
-        } label: {
-            VStack(spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, minHeight: 52)
-        }
-        .buttonStyle(.bordered)
     }
 }
 

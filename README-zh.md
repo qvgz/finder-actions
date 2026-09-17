@@ -24,7 +24,7 @@ Finder Actions 为 macOS Finder 增加实用的右键功能。你可以在 Finde
    xattr -dr com.apple.quarantine "/Applications/Finder Actions.app"
    ```
 
-4. 打开一次 Finder Actions，并在提示中选择 **English** 或 **中文（简体）**。
+4. 打开一次 Finder Actions。macOS 首选语言为中文时显示中文，其他系统语言均显示英文。
 5. 前往“系统设置 → 通用 → 登录项与扩展 → Finder 扩展”，启用 **FinderActionsExtension**。
 6. 回到 Finder。如果右键功能没有立即出现，请重新打开 Finder：
 
@@ -45,7 +45,7 @@ Finder Actions 不需要加入登录项，也不需要保持窗口打开。请�
 
 排序和其他功能列表变化会自动保存，通常不需要重新打开 Finder。移除功能不会删除对应脚本，以后仍可重新添加。
 
-以后如需更改界面语言，请展开设置窗口底部的 **Language / 语言**，然后选择英文或简体中文。
+如需覆盖系统语言，请展开设置窗口底部的 **Language / 语言**，然后选择英文或简体中文。手动选择会被记住，并且优先于之后的系统语言变化。
 
 ## 设置显示位置
 

@@ -24,7 +24,7 @@ Finder Actions requires macOS 13 Ventura or later.
    xattr -dr com.apple.quarantine "/Applications/Finder Actions.app"
    ```
 
-4. Open Finder Actions once and choose **English** or **中文（简体）** when prompted.
+4. Open Finder Actions once. It uses Chinese when Chinese is the primary macOS language; all other system languages use English.
 5. Go to **System Settings → General → Login Items & Extensions → Finder Extensions**, then enable **FinderActionsExtension**.
 6. Return to Finder. If the actions do not appear immediately, restart Finder:
 
@@ -45,7 +45,7 @@ Open Finder Actions, then:
 
 Changes, including action order, are saved automatically and normally do not require restarting Finder. Removing an action does not delete its script, so you can add it again later.
 
-To change the interface language later, expand **Language / 语言** at the bottom of the settings window and select English or Simplified Chinese.
+To override the system language, expand **Language / 语言** at the bottom of the settings window and select English or Simplified Chinese. Your selection is remembered and takes priority over future system-language changes.
 
 ## Choose Where Actions Appear
 
